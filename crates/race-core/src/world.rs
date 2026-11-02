@@ -2245,7 +2245,7 @@ impl World {
                 lc.pos += d.normalize_or_zero() * (40.0 * DT).min(d.length());
             } else {
                 lc.pos += lc.vel * DT;
-                lc.vel *= (-3.0 * DT).exp();
+                lc.vel *= crate::math::exp(-3.0 * DT);
                 let pr = track.project(lc.pos, lc.hint as usize);
                 lc.hint = pr.idx as u32;
                 let hb = track.half_band(pr.s, pr.lateral) - 0.5;

@@ -3,7 +3,8 @@
 // Rust adaptation of Arm Optimized Routines v26.01 math/sinf.c,
 // sincosf.h and sincosf_data.c, under their MIT licence option.
 // https://github.com/ARM-software/optimized-routines/tree/v26.01/math
-// See ../../ARM-MATH-LICENSE. Wasm has no floating-point exception flags.
+// See ../../ARM-MATH-LICENSE. This port raises no floating-point exception flags
+// and sets no errno on any target; out-of-domain inputs return NaN.
 
 const INV_HALF_PI: f64 = f64::from_bits(0x41645f306dc9c883);
 const HALF_PI: f64 = f64::from_bits(0x3ff921fb54442d18);

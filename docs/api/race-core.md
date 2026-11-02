@@ -829,10 +829,20 @@ reliable copies of those events for your own racer to avoid doubles.
   release, more in debug). Warm all eleven on a load screen (`for id in TrackId::ALL { id.track(); }`).
 - Arenas are in `TrackId::ALL` but not `RACE_ALL`: track pickers for races
   should use `RACE_ALL`, battle pickers `ARENAS`.
-- Determinism is exact on one machine/build. `sin/cos/exp/atan2` come from the
-  platform libm, so an x86 host and an ARM client can differ in the last bit;
-  prediction self-corrects from `own` snapshots, but do not compare full world
-  hashes across architectures.
+- Determinism is exact on one machine/build, and the eight transcendentals the
+  sim uses (`sin`, `cos`, `tan`, `atan2`, `exp`, `powf`, `asin`, `acos`) compute
+  identical bits on every target: they go through `race_core::math`, which runs
+  the same pure-Rust code everywhere (the `sin`/`cos`/`tan`/`atan2` ports and the
+  exactly pinned `libm` crate), never the platform's maths library. Simulation
+  code must not call the `f32` methods for these directly; a source-scan test
+  fails if it does. A change to any of these routines, or to the pinned `libm`
+  version, changes the sim's bits and so needs the same care as a rules change.
+  This is not a claim of full float determinism across targets: `f32::min` and
+  `f32::max` of opposite zeros (`+0.0` and `-0.0`) are unspecified and may differ
+  between targets, nothing here covers that, and `rem_euclid` and `%` still use
+  the platform's exact `fmod`. Prediction self-corrects from `own` snapshots, so
+  last-bit differences elsewhere are corrected rather than compared; do not rely
+  on full world hashes matching across architectures.
 
 ## Examples
 

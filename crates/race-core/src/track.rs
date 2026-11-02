@@ -1284,7 +1284,7 @@ impl Track {
             for _ in 0..count {
                 let s = rng.gen::<f32>() * l;
                 let side = if rng.gen::<bool>() { 1.0 } else { -1.0 };
-                let off = dmin + rng.gen::<f32>().powf(1.5) * (dmax - dmin);
+                let off = dmin + crate::math::powf(rng.gen::<f32>(), 1.5) * (dmax - dmin);
                 let yaw = rng.gen::<f32>() * std::f32::consts::TAU;
                 let scale = lerp(smin, smax, rng.gen::<f32>());
                 let sm = self.sample_at(s);
@@ -1436,14 +1436,14 @@ mod grid_reference_tests {
         }
         for i in 1..=80 {
             let angle = -std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 80.0;
-            points.push(Vec2::new(200.0 + 50.0 * angle.cos(), 50.0 * angle.sin()));
+            points.push(Vec2::new(200.0 + 50.0 * crate::math::cos(angle), 50.0 * crate::math::sin(angle)));
         }
         for i in 1..=100 {
             points.push(Vec2::new(200.0 - i as f32 * 2.0, 50.0));
         }
         for i in 1..=80 {
             let angle = std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 80.0;
-            points.push(Vec2::new(50.0 * angle.cos(), 50.0 * angle.sin()));
+            points.push(Vec2::new(50.0 * crate::math::cos(angle), 50.0 * crate::math::sin(angle)));
         }
         points
     }
@@ -1476,7 +1476,7 @@ mod grid_reference_tests {
         let points: Vec<_> = (0..=500)
             .map(|i| {
                 let angle = 0.9 + std::f32::consts::TAU * i as f32 / 500.0;
-                glam::Vec2::new(150.0 * angle.sin(), 100.0 * angle.sin() * angle.cos())
+                glam::Vec2::new(150.0 * crate::math::sin(angle), 100.0 * crate::math::sin(angle) * crate::math::cos(angle))
             })
             .collect();
         let shaped = custom::shape(&points, false, 18.0).unwrap();
