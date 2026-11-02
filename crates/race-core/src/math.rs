@@ -4,14 +4,21 @@
 //! `forward = (sin yaw, 0, cos yaw)`, `right = forward x up = (-cos yaw, 0, sin yaw)`.
 //! Positive steer turns right, which decreases yaw.
 //!
-//! Every transcendental function the simulation uses goes through this module,
-//! and nowhere else: `sin`, `cos`, `tan`, `atan2`, `exp`, `powf`, `asin` and
-//! `acos` below are the only ones, and each runs the same pure-Rust algorithm
-//! (the ports in the submodules, or the pinned `libm` crate) on every target, so
-//! all targets compute identical bits. Never call the `f32` methods
-//! (`.sin()`, `.exp()`, `.powf()`, ...) in simulation code: they use the
-//! toolchain's or the platform's maths library and differ between targets. A
-//! source scan in this module's tests fails the build if one appears.
+//! The eight transcendental functions the simulation uses (`sin`, `cos`, `tan`,
+//! `atan2`, `exp`, `powf`, `asin` and `acos`) are defined below and nowhere
+//! else. Each runs the same pure-Rust algorithm (the ports in the submodules, or
+//! the pinned `libm` crate) on every target, so these eight compute identical
+//! bits everywhere. Never call the `f32` methods (`.sin()`, `.exp()`,
+//! `.powf()`, ...) in simulation code: they use the toolchain's or the
+//! platform's maths library and can differ between targets. A source scan in
+//! this module's tests fails the build if one appears.
+//!
+//! That is all this module claims; it is not full float determinism across
+//! targets. `f32::min` and `f32::max` of opposite zeros (`+0.0` and `-0.0`)
+//! return an unspecified one of them, which may differ between targets, and
+//! nothing here covers that. `%` and `rem_euclid` still call the platform's
+//! `fmod`, which is exact by definition and so is expected to agree, but is not
+//! routed through this module.
 
 use glam::Vec3;
 
@@ -499,20 +506,30 @@ mod tests {
 
     // ---- Bypass guard -----------------------------------------------------
 
+    /// `f32` methods whose result comes from the toolchain's or the platform's
+    /// maths library, or is not specified to be the same on every target
+    /// (`powi`, `mul_add`, `sin_cos`).
     const FORBIDDEN: &[&str] = &[
         "sin", "cos", "tan", "atan2", "asin", "acos", "atan", "exp", "exp2", "ln", "log", "log2",
-        "log10", "powf", "hypot", "cbrt", "sin_cos", "mul_add", "sinh", "cosh", "tanh", "asinh",
-        "acosh", "atanh", "exp_m1", "ln_1p",
+        "log10", "powf", "powi", "hypot", "cbrt", "sin_cos", "mul_add", "sinh", "cosh", "tanh",
+        "asinh", "acosh", "atanh", "exp_m1", "ln_1p",
     ];
 
-    /// Files (relative to `crates/`) whose test-only code may call the platform
-    /// maths: it drives inputs into the sim or builds sample data and never
-    /// reaches simulation state. In these files only the text from the first
-    /// `#[cfg(test)]` line onward is exempt.
-    const TEST_TAIL_ALLOWED: &[&str] = &[
-        // Prediction test drivers feeding steering inputs (lines in `#[cfg(test)]` modules).
+    /// glam helpers that call `sin`, `cos`, `atan2` or `acos` inside glam, which
+    /// uses the platform's maths library.
+    const FORBIDDEN_GLAM: &[&str] = &[
+        "from_angle", "to_angle", "angle_to", "angle_between", "rotate_x", "rotate_y", "rotate_z",
+        "slerp",
+    ];
+
+    /// Files (relative to `crates/`) that are scanned except for their
+    /// `#[cfg(test)]` items (modules and functions, found by brace matching):
+    /// that code drives inputs into the sim or builds sample data and never
+    /// reaches simulation state. All other code in these files is scanned.
+    const TEST_ITEMS_ALLOWED: &[&str] = &[
+        // Prediction test drivers feeding steering inputs (`#[cfg(test)]` modules).
         "race-session/src/client.rs",
-        // `#[cfg(test)]` sample-track helper.
+        // `#[cfg(test)]` sample-track helper and test module.
         "race-session/src/track_transfer.rs",
     ];
     /// Files that are wholly test code (`#[cfg(test)] mod tests;`).
@@ -529,23 +546,142 @@ mod tests {
         }
     }
 
-    /// Lines of `text` that call a forbidden method or `f32::`/`f64::` path
-    /// function directly. Line comments are ignored.
+    fn is_ident(c: char) -> bool {
+        c.is_ascii_alphanumeric() || c == '_'
+    }
+
+    /// True if `code` contains `needle` and the text after it does not continue
+    /// an identifier (so `f32::sin` matches in `map(f32::sin)` but not `f32::sine`).
+    fn has_word(code: &str, needle: &str) -> bool {
+        code.match_indices(needle)
+            .any(|(at, _)| !code[at + needle.len()..].chars().next().is_some_and(is_ident))
+    }
+
+    /// Lines of `text` that use a forbidden maths function: a method call
+    /// (whatever the spacing), an `f32::`/`f64::`/`<f32>::` path (called or
+    /// passed as a value), or one of the glam angle helpers. Line comments are
+    /// ignored.
     fn violations(text: &str) -> Vec<(usize, String)> {
         let mut found = Vec::new();
         for (n, line) in text.lines().enumerate() {
             let code = line.split("//").next().unwrap_or("");
-            for name in FORBIDDEN {
-                let method = format!(".{name}(");
-                let f32_path = format!("f32::{name}(");
-                let f64_path = format!("f64::{name}(");
-                if code.contains(&method) || code.contains(&f32_path) || code.contains(&f64_path) {
-                    found.push((n + 1, line.trim().to_string()));
-                    break;
-                }
+            let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+            let float_maths = FORBIDDEN.iter().any(|name| {
+                compact.contains(&format!(".{name}("))
+                    || ["f32::", "f64::", "f32>::", "f64>::"]
+                        .iter()
+                        .any(|path| has_word(&compact, &format!("{path}{name}")))
+            });
+            let glam_maths = FORBIDDEN_GLAM
+                .iter()
+                .any(|name| compact.contains(&format!(".{name}(")) || compact.contains(&format!("::{name}(")));
+            if float_maths || glam_maths {
+                found.push((n + 1, line.trim().to_string()));
             }
         }
         found
+    }
+
+    /// Index just past the item that begins at `from` (after an attribute): the
+    /// matching `}` of its first `{ .. }`, or its `;` if that comes first.
+    /// Comments, strings and character literals are skipped.
+    fn item_end(b: &[u8], from: usize) -> usize {
+        let (mut i, mut braces, mut parens, mut opened) = (from, 0usize, 0usize, false);
+        while i < b.len() {
+            match b[i] {
+                b'/' if b.get(i + 1) == Some(&b'/') => {
+                    while i < b.len() && b[i] != b'\n' {
+                        i += 1;
+                    }
+                    continue;
+                }
+                b'/' if b.get(i + 1) == Some(&b'*') => {
+                    let mut depth = 1;
+                    i += 2;
+                    while i < b.len() && depth > 0 {
+                        if b[i] == b'/' && b.get(i + 1) == Some(&b'*') {
+                            depth += 1;
+                            i += 1;
+                        } else if b[i] == b'*' && b.get(i + 1) == Some(&b'/') {
+                            depth -= 1;
+                            i += 1;
+                        }
+                        i += 1;
+                    }
+                    continue;
+                }
+                b'r' if i == 0 || !is_ident(b[i - 1] as char) || b[i - 1] == b'b' => {
+                    let hashes = b[i + 1..].iter().take_while(|&&c| c == b'#').count();
+                    if b.get(i + 1 + hashes) == Some(&b'"') {
+                        let mut close = vec![b'"'];
+                        close.extend(std::iter::repeat(b'#').take(hashes));
+                        i += 2 + hashes;
+                        while i < b.len() && !b[i..].starts_with(&close) {
+                            i += 1;
+                        }
+                        i += close.len();
+                        continue;
+                    }
+                }
+                b'"' => {
+                    i += 1;
+                    while i < b.len() && b[i] != b'"' {
+                        i += if b[i] == b'\\' { 2 } else { 1 };
+                    }
+                }
+                b'\'' => {
+                    if b.get(i + 1) == Some(&b'\\') {
+                        i += 3;
+                        while i < b.len() && b[i] != b'\'' {
+                            i += 1;
+                        }
+                    } else if b.get(i + 2) == Some(&b'\'') {
+                        i += 2;
+                    }
+                }
+                b'(' | b'[' => parens += 1,
+                b')' | b']' => parens = parens.saturating_sub(1),
+                b'{' => {
+                    braces += 1;
+                    opened = true;
+                }
+                b'}' => {
+                    braces = braces.saturating_sub(1);
+                    if opened && braces == 0 {
+                        return i + 1;
+                    }
+                }
+                b';' if !opened && parens == 0 => return i + 1,
+                _ => {}
+            }
+            i += 1;
+        }
+        b.len()
+    }
+
+    /// `text` with every item marked `#[cfg(test)]` (module, function, `use`)
+    /// blanked out. Line breaks stay, so line numbers still match the file.
+    fn without_test_items(text: &str) -> String {
+        let b = text.as_bytes();
+        let mut out = b.to_vec();
+        let mut line_start = 0;
+        let mut blanked_to = 0;
+        for line in text.split_inclusive('\n') {
+            let at = line_start;
+            line_start += line.len();
+            let attr = "#[cfg(test)]";
+            if at >= blanked_to && line.trim_start().starts_with(attr) {
+                let from = at + line.len() - line.trim_start().len() + attr.len();
+                let end = item_end(b, from);
+                for byte in &mut out[at..end] {
+                    if *byte != b'\n' {
+                        *byte = b' ';
+                    }
+                }
+                blanked_to = end;
+            }
+        }
+        String::from_utf8(out).expect("blanking whole bytes inside ASCII delimiters keeps UTF-8")
     }
 
     fn scan_simulation_sources() -> Vec<String> {
@@ -565,10 +701,8 @@ mod tests {
                     continue;
                 }
                 let mut text = std::fs::read_to_string(&file).unwrap();
-                if TEST_TAIL_ALLOWED.contains(&rel.as_str()) {
-                    if let Some(at) = text.find("#[cfg(test)]") {
-                        text.truncate(at);
-                    }
+                if TEST_ITEMS_ALLOWED.contains(&rel.as_str()) {
+                    text = without_test_items(&text);
                 }
                 for (line, code) in violations(&text) {
                     report.push(format!("{rel}:{line}: {code}"));
@@ -595,6 +729,69 @@ mod tests {
         assert!(!violations("let a = f32::exp(x);").is_empty());
         assert!(!violations("let a = v.dot(w).acos().to_degrees();").is_empty());
         assert!(violations("let a = crate::math::sin(x); // not .sin() here").is_empty());
-        assert!(violations("let a = x.sqrt() + x.powi(2);").is_empty());
+        assert!(violations("let a = x.sqrt() + x.hypot2();").is_empty());
+        assert!(violations("let a = f32::EPSILON + f32::consts_like + f32::sine_table;").is_empty());
+    }
+
+    #[test]
+    fn the_bypass_scan_recognises_the_less_obvious_forms() {
+        // `powi` is not specified to give the same bits on every target.
+        assert!(!violations("let a = x.powi(2);").is_empty());
+        assert!(!violations("let a = f32::powi(x, 2);").is_empty());
+        // Paths passed as values, qualified paths and odd spacing.
+        assert!(!violations("let v: Vec<f32> = xs.iter().copied().map(f32::sin).collect();").is_empty());
+        assert!(!violations("let a = <f32>::exp(x);").is_empty());
+        assert!(!violations("let a = f64::from(x).powf(0.5);").is_empty());
+        assert!(!violations("let a = x . sin ();").is_empty());
+        assert!(!violations("    .atan2(y)").is_empty());
+        // glam helpers that call platform maths inside glam.
+        assert!(!violations("let a = Vec2::from_angle(yaw);").is_empty());
+        assert!(!violations("let a = v.to_angle() + v.angle_to(w);").is_empty());
+        assert!(!violations("let a = v.angle_between(w);").is_empty());
+        assert!(!violations("let a = v.rotate_x(1.0).rotate_y(1.0).rotate_z(1.0);").is_empty());
+        assert!(!violations("let a = q.slerp(r, t);").is_empty());
+        // Our own helpers stay allowed, however they are qualified.
+        assert!(violations("let a = math::sin(x) + crate::math::powf(x, 1.5);").is_empty());
+        assert!(violations("let a = race_core::math::yaw_of(d);").is_empty());
+    }
+
+    #[test]
+    fn test_items_are_blanked_by_brace_matching_and_nothing_else() {
+        let text = concat!(
+            "fn production() { let a = x.sin(); }\n",
+            "#[cfg(test)]\n",
+            "mod tests {\n",
+            "    fn t<'a>(s: &'a str) { let _ = (s, '}', \"}{\", r#\"}\"#, '\\''); x.sin(); }\n",
+            "    // }\n",
+            "    /* } */\n",
+            "}\n",
+            "fn also_production() { let b = y.cos(); }\n",
+            "#[cfg(test)]\n",
+            "pub(crate) fn helper(n: [u8; 4]) -> f32 { { n[0] as f32 }.exp() }\n",
+            "#[cfg(test)]\n",
+            "use std::collections::{HashMap, HashSet};\n",
+            "fn last() { z.tan(); }\n",
+        );
+        let kept = without_test_items(text);
+        assert_eq!(kept.lines().count(), text.lines().count(), "line numbers must survive");
+        let lines: Vec<usize> = violations(&kept).into_iter().map(|(n, _)| n).collect();
+        assert_eq!(lines, vec![1, 8, 13], "production lines stay scanned, test items are blanked: {kept}");
+        assert!(!violations(text).is_empty() && violations(text).len() > 3);
+    }
+
+    #[test]
+    fn the_scan_still_reads_the_production_code_in_the_partly_test_files() {
+        // A wrong brace match would silently hide code from the guard, so check
+        // that known production code in each file survives the blanking.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../race-session/src");
+        let client = without_test_items(&std::fs::read_to_string(root.join("client.rs")).unwrap());
+        for marker in ["fn sanitize_own", "fn fx_events", "impl Race", "fn net_yaw"] {
+            assert!(client.contains(marker), "client.rs: {marker} was blanked out of the scan");
+        }
+        for marker in ["mod rose_view_tests", "mod effect_replay_tests", "mod keep_pass_tests"] {
+            assert!(!client.contains(marker), "client.rs: {marker} should be blanked");
+        }
+        let transfer = without_test_items(&std::fs::read_to_string(root.join("track_transfer.rs")).unwrap());
+        assert!(!transfer.contains("fn sample_track") && !transfer.contains("mod tests"));
     }
 }
