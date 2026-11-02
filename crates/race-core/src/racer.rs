@@ -110,7 +110,7 @@ impl Drift {
         let steered = if u < 0.0 { t.drift_counter_time } else { t.drift_steer_time };
         let tau = lerp(steered, t.drift_carry_time, centred).max(1e-3);
         let from = self.carry();
-        let want = from + (target - from) * (1.0 - (-dt / tau).exp());
+        let want = from + (target - from) * (1.0 - crate::math::exp(-dt / tau));
         let mut q = (want * 100.0).round().clamp(0.0, 255.0) as u8;
         if q == self.carry_q && (target - from).abs() >= 0.01 {
             // Never stall short of the target for want of a whole step.
@@ -926,7 +926,7 @@ impl Racer {
                 t.grip
             };
             let sp_before = hv.length();
-            let vl3 = vl2 * (-g * dt).exp();
+            let vl3 = vl2 * crate::math::exp(-g * dt);
             let mut vf3 = vf2;
             if self.stun_t <= 0.0 && vf2.abs() > 1.0 {
                 vf3 += vf2.signum() * (vl2.abs() - vl3.abs()) * t.grip_redirect;
@@ -1068,7 +1068,7 @@ impl Racer {
         }
         // The wheelspin takes its speed over the ease-in rather than in one jolt.
         if self.drift.active && self.drift.blend_q < 255 {
-            hv *= (1.0 - t.drift_scrub).powf(dt / t.drift_ease_in.max(0.05));
+            hv *= crate::math::powf(1.0 - t.drift_scrub, dt / t.drift_ease_in.max(0.05));
         }
         let mut vy = self.vel.y;
 
@@ -1333,7 +1333,7 @@ impl Racer {
         let (lyaw, lpitch) = if dist > 1e-3 {
             let hy = yaw_of(self.head_dir());
             let yo = wrap_angle(yaw_of(d) - hy);
-            let pi = (d.y / dist).clamp(-1.0, 1.0).asin();
+            let pi = crate::math::asin((d.y / dist).clamp(-1.0, 1.0));
             (yo, pi)
         } else {
             (0.0, 0.0)

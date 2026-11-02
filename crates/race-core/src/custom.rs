@@ -886,7 +886,7 @@ fn find_crossings(pts: &[Vec2], cum: &[f32]) -> Vec<RawX> {
                 continue;
             }
             let (da, db) = ((b - a).normalize_or_zero(), (d - c).normalize_or_zero());
-            let angle = da.dot(db).abs().clamp(0.0, 1.0).acos().to_degrees();
+            let angle = crate::math::acos(da.dot(db).abs().clamp(0.0, 1.0)).to_degrees();
             out.push(RawX {
                 i,
                 j,
@@ -1593,7 +1593,7 @@ pub fn hill_heights(track: &CustomTrack, shaped: &Shaped) -> Vec<f32> {
     let mut rng = Pcg32::seed_from_u64(mix64(track.seed as u64 ^ 0x4849_4C4C_5300_0000 ^ track.hills as u64));
     let waves: Vec<(f32, f32)> = (1..=harmonics)
         .map(|k| {
-            let amp = rng.gen_range(0.6f32..1.0) / (k as f32).powf(0.8);
+            let amp = rng.gen_range(0.6f32..1.0) / crate::math::powf(k as f32, 0.8);
             let phase = rng.gen_range(0.0f32..std::f32::consts::TAU);
             (amp, phase)
         })

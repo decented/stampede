@@ -829,10 +829,14 @@ reliable copies of those events for your own racer to avoid doubles.
   release, more in debug). Warm all eleven on a load screen (`for id in TrackId::ALL { id.track(); }`).
 - Arenas are in `TrackId::ALL` but not `RACE_ALL`: track pickers for races
   should use `RACE_ALL`, battle pickers `ARENAS`.
-- Determinism is exact on one machine/build. `sin/cos/exp/atan2` come from the
-  platform libm, so an x86 host and an ARM client can differ in the last bit;
-  prediction self-corrects from `own` snapshots, but do not compare full world
-  hashes across architectures.
+- Determinism is exact across targets. Every transcendental the sim uses
+  (`sin`, `cos`, `tan`, `atan2`, `exp`, `powf`, `asin`, `acos`) goes through
+  `race_core::math`, which runs the same pure-Rust code on every target (the
+  `sin`/`cos`/`tan`/`atan2` ports and the exactly pinned `libm` crate), never
+  the platform's maths library. Simulation code must not call the `f32`
+  methods for these directly; a source-scan test fails if it does. A change to
+  any of these routines, or to the pinned `libm` version, changes the sim's
+  bits and so needs the same care as a rules change.
 
 ## Examples
 

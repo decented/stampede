@@ -33,7 +33,9 @@ python3 qualification/build-component.py "$STAMPEDE_COMPONENT_OUT"
 
 The wrapper pins the compiler, records artifact digests and refuses an artifact
 that retains the selected local source/cache paths. It changes no game code or
-WASM feature. The packer bounds input/output, requires an import-free core
+WASM feature. The guest and the native build run the same simulation maths
+(`race_core::math`: ported routines and the exactly pinned `libm` crate), so both
+compute identical bits. The packer bounds input/output, requires an import-free core
 and validates component encoding.
 The runtime still enforces the authority world, capabilities and resource profile.
 Building a component does not qualify a tier, platform, recovery or production
