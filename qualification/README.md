@@ -41,3 +41,15 @@ The runtime still enforces the authority world, capabilities and resource profil
 Building a component does not qualify a tier, platform, recovery or production
 deployment. Retain exact source revisions, toolchain, artifact digests and
 comparison reports when running acceptance.
+
+Compare built-in geometry and a fixed custom-track set on each native target:
+
+```sh
+cargo +1.99.1 run --locked -p race-core --example track_hashes
+```
+
+The three custom fixtures include a flat loop, a hilly loop and a hilly figure
+eight. They exercise crossing angles and hill harmonics, and print separate
+hashes for the saved track, converted definition and complete built geometry.
+Compare the exact output across targets; a mismatch is a finding, not permission
+to change simulation maths. This diagnostic adds no protocol or golden hashes.

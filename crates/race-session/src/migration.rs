@@ -3782,6 +3782,27 @@ mod tests {
     }
     #[test]
     fn custom_track_registry_changes_only_after_commit_and_never_during_a_failed_stage() {
+        isolated_registry_test(custom_track_registry_commit_case);
+    }
+
+    // Registry observations need their own process: locking just these two tests
+    // would still race every other test that installs a custom track.
+    fn isolated_registry_test(case: fn()) {
+        const CHILD: &str = "STAMPEDE_REGISTRY_TEST";
+        let name = std::thread::current().name().expect("test thread name").to_owned();
+        if std::env::var(CHILD).as_deref() == Ok(name.as_str()) {
+            case();
+            return;
+        }
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &name, "--nocapture"])
+            .env(CHILD, &name)
+            .status()
+            .expect("start isolated registry test");
+        assert!(status.success(), "isolated registry test {name}: {status}");
+    }
+
+    fn custom_track_registry_commit_case() {
         let unrelated = crate::track_transfer::sample_track("Other room", 180.0);
         race_core::custom::install(race_core::custom::to_def(&unrelated).unwrap());
         let generation = race_core::custom::generation();
@@ -3882,6 +3903,10 @@ mod tests {
     }
     #[test]
     fn custom_track_restore_uses_checkpoint_content_not_another_rooms_registry() {
+        isolated_registry_test(custom_track_registry_restore_case);
+    }
+
+    fn custom_track_registry_restore_case() {
         let mut original = host();
         let track = crate::track_transfer::sample_track("Migration loop", 95.0);
         original.set_custom_track(&track).unwrap();
