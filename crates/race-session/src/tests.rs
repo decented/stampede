@@ -16,6 +16,26 @@ use crate::view::RaceDriver;
 
 mod jitter;
 
+// A registry observer needs its own process: locking observers together still
+// races other tests that install custom tracks.
+pub(crate) fn isolated_registry_test(case: fn()) {
+    const CHILD: &str = "STAMPEDE_REGISTRY_TEST";
+    let name = std::thread::current()
+        .name()
+        .expect("test thread name")
+        .to_owned();
+    if std::env::var(CHILD).as_deref() == Ok(name.as_str()) {
+        case();
+        return;
+    }
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", &name, "--nocapture"])
+        .env(CHILD, &name)
+        .status()
+        .expect("start isolated registry test");
+    assert!(status.success(), "isolated registry test {name}: {status}");
+}
+
 /// Who drives a test client's controls.
 #[derive(Clone, Copy)]
 enum Pilot {

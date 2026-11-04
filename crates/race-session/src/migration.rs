@@ -3782,6 +3782,10 @@ mod tests {
     }
     #[test]
     fn custom_track_registry_changes_only_after_commit_and_never_during_a_failed_stage() {
+        crate::tests::isolated_registry_test(custom_track_registry_commit_case);
+    }
+
+    fn custom_track_registry_commit_case() {
         let unrelated = crate::track_transfer::sample_track("Other room", 180.0);
         race_core::custom::install(race_core::custom::to_def(&unrelated).unwrap());
         let generation = race_core::custom::generation();
@@ -3882,6 +3886,10 @@ mod tests {
     }
     #[test]
     fn custom_track_restore_uses_checkpoint_content_not_another_rooms_registry() {
+        crate::tests::isolated_registry_test(custom_track_registry_restore_case);
+    }
+
+    fn custom_track_registry_restore_case() {
         let mut original = host();
         let track = crate::track_transfer::sample_track("Migration loop", 95.0);
         original.set_custom_track(&track).unwrap();

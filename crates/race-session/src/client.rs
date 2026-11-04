@@ -2043,6 +2043,9 @@ mod migration_transaction_tests {
     }
     #[test]
     fn completed_custom_download_and_track_ready_intent_adopt_together_without_cache_leaks() {
+        crate::tests::isolated_registry_test(completed_custom_download_case);
+    }
+    fn completed_custom_download_case() {
         let old=crate::track_transfer::sample_track("Other room",180.0);custom::install(custom::to_def(&old).unwrap());let generation=custom::generation();
         let track=crate::track_transfer::sample_track("Received track",95.0);let bytes=track.to_bytes();let chunks:Vec<_>=bytes.chunks(crate::track_transfer::CHUNK_BYTES).collect();let total=chunks.len() as u8;
         let (mut c,wire)=client();c.phase=ClientPhase::Lobby;c.race=None;c.view=None;
