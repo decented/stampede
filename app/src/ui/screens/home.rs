@@ -24,6 +24,7 @@ pub struct HomeScreen {
     /// Where the "Update to vX" pill was drawn last frame (a tap on it opens Settings, not the menu).
     pill_rect: Option<Rect>,
     /// Screenshots: show an update on offer.
+    #[cfg_attr(target_os = "android", allow(dead_code))]
     demo_update: bool,
 }
 
@@ -63,6 +64,9 @@ impl Screen for HomeScreen {
     fn update(&mut self, ctx: &mut Ctx) -> Transition {
         common::begin(ctx, &mut self.t);
         crate::game::stage::show_attract(self.track);
+        // Staged screenshots only (a desktop path): the kit's staging methods exist only with its
+        // `testing` feature, on for non-Android builds only.
+        #[cfg(not(target_os = "android"))]
         if std::mem::take(&mut self.demo_update) && ctx.opts.shot.is_some() {
             ctx.updates.demo_offer("0.3.0", "");
         }

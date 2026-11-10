@@ -4,8 +4,6 @@
 
 #[cfg(target_os = "android")]
 pub mod android;
-#[cfg(target_os = "android")]
-pub mod updater_android;
 pub mod data_dir;
 pub mod lan;
 pub mod lifecycle;

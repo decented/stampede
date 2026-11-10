@@ -23,11 +23,11 @@ pub mod keeps;
 pub mod nostr_fetch;
 pub mod online;
 pub mod platform;
+pub mod release;
 pub mod render;
 pub mod shot;
 pub mod sound;
 pub mod ui;
-pub mod update;
 
 use cli::Options;
 use engine::Engine;
