@@ -3,7 +3,7 @@
 Stampede's multiplayer layer (SPEC section 10): lobby, a host-authoritative
 race protocol with client prediction, over Fray's shared transport
 (loopback hub for tests, QUIC over `decented-net` for real). Deps: `race-core`,
-`decented-net` (Cargo alias for `fray-net` in `../forgesworn/fray`), bincode 1.3, serde,
+`decented-net` (Cargo alias for `fray-net` from github.com/forgesworn/fray), bincode 1.3, serde,
 log, rand 0.8, rand_pcg 0.3, getrandom 0.3. No threads of its own: you drive it
 with explicit `now_ms` (milliseconds on any monotonic clock).
 

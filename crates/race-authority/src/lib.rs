@@ -45,7 +45,8 @@ mod component {
     use std::sync::Mutex;
 
     wit_bindgen::generate!({
-        path: "../../../forgesworn/fray/crates/fray-session/wit",
+        // A byte copy of fray-session's frozen contract; see tests/wit_contract.rs.
+        path: "../../crates/race-authority/wit",
         world: "game-authority",
     });
     use exports::fray::authority::authority as wire;
