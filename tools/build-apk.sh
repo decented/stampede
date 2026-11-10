@@ -4,9 +4,11 @@
 # tools/packaging/android/build-apk.sh, MIT).
 #
 # The Java is small (app/android/java): StampedeActivity (NativeActivity +
-# onNewIntent), RoomService, and the in-app updater (Updater, UpdateReceiver,
-# ApkCheck: download, verify, PackageInstaller); every other OS service is a
-# JNI call from Rust. So the
+# onNewIntent), RoomService and the tilt input. The in-app updater's Java
+# (Updater, UpdateReceiver, ApkCheck, RedirectRule: download, verify,
+# PackageInstaller) is nostr-release-kit's, compiled in from $KIT/android/java and
+# tested on the host JDK with the kit's own tests and vectors; every other OS
+# service is a JNI call from Rust. So the
 # pipeline is
 #   cargo-ndk -> aapt2 compile/link -> javac + d8 -> zip in the .so and
 #   classes.dex -> zipalign -> apksigner.
@@ -34,7 +36,9 @@
 #
 # Environment (all optional): ANDROID_HOME (default ~/Android/Sdk),
 # ANDROID_NDK_HOME (default: newest NDK), BUILD_TOOLS, PLATFORM, ABI, PROFILE,
-# DIAG, JOBS (default 4), NICE (default 10), CARGO_TARGET_DIR
+# DIAG, KIT (the nostr-release-kit checkout, at the revision app/Cargo.toml pins;
+# default ../forgesworn/nostr-release-kit beside this repo), JOBS (default 4),
+# NICE (default 10), CARGO_TARGET_DIR
 # (default ~/.cache/twangthang-target: SHARED with Twang Thang on purpose,
 # disk is tight; never point it at a fresh directory), OUT, KEYSTORE.
 
@@ -45,6 +49,8 @@ REPO="$(cd "$HERE/.." && pwd)"
 ANDROID_DIR="$REPO/app/android"
 LIB=libstampede.so
 APP_ID=org.decented.stampede
+# nostr-release-kit: its android/java is compiled into the APK, its tests and vectors run below.
+KIT="${KIT:-$REPO/../forgesworn/nostr-release-kit}"
 
 # ── Config ──────────────────────────────────────────────────────────────────
 SDK="${ANDROID_HOME:-$HOME/Android/Sdk}"
@@ -70,6 +76,11 @@ for tool in javac; do command -v "$tool" >/dev/null || { echo "ERROR: $tool not 
 [ -x "$BUILD_TOOLS/d8" ] || { echo "ERROR: d8 not in $BUILD_TOOLS" >&2; exit 1; }
 [ -f "$PLATFORM/android.jar" ] || { echo "ERROR: no android.jar in $PLATFORM" >&2; exit 1; }
 [ -d "$NDK" ] || { echo "ERROR: NDK not found (set ANDROID_NDK_HOME)" >&2; exit 1; }
+[ -d "$KIT/android/java/dev/forgesworn/release" ] || { echo "ERROR: nostr-release-kit not found at $KIT (set KIT)" >&2; exit 1; }
+# The kit's Java must come from the same revision as the Rust crate pinned in app/Cargo.toml.
+KIT_REV="$(grep -o 'nostr-release-kit", rev = "[0-9a-f]*' "$REPO/app/Cargo.toml" | head -1 | grep -o '[0-9a-f]*$')"
+KIT_HEAD="$(git -C "$KIT" rev-parse HEAD 2>/dev/null || true)"
+[ -n "$KIT_REV" ] && [ "$KIT_HEAD" = "$KIT_REV" ] || { echo "ERROR: $KIT is at ${KIT_HEAD:-?}, app/Cargo.toml pins nostr-release-kit $KIT_REV (git -C \"$KIT\" checkout $KIT_REV)" >&2; exit 1; }
 command -v cargo-ndk >/dev/null || { echo "ERROR: cargo-ndk missing (cargo install cargo-ndk)" >&2; exit 1; }
 case "$PROFILE" in release|debug) ;; *) echo "ERROR: PROFILE must be release or debug" >&2; exit 1 ;; esac
 case "$OUT" in "$REPO"|"$REPO"/*) echo "ERROR: OUT must be outside the repo (APKs are never committed)" >&2; exit 1 ;; esac
@@ -149,19 +160,23 @@ echo ">>> [2/6] aapt2 compile + link (versionCode=$VERSION_CODE versionName=$VER
 # ── 3. Java -> classes.dex ─────────────────────────────────────────────────
 # --release 11 is the lowest javac 21 accepts without a warning; d8 desugars
 # for minSdk (lambdas included).
-echo ">>> [3/6] javac + d8 (app/android/java -> classes.dex, minSdk=$MIN_SDK)"
+echo ">>> [3/6] javac + d8 (app/android/java + the kit's android/java -> classes.dex, minSdk=$MIN_SDK)"
 mkdir -p "$STAGE/classes" "$STAGE/dex" "$STAGE/test-classes"
-find "$ANDROID_DIR/java" -name '*.java' | sort > "$STAGE/sources.txt"
+find "$ANDROID_DIR/java" "$KIT/android/java" -name '*.java' | sort > "$STAGE/sources.txt"
 javac --release 11 -Xlint:all -d "$STAGE/classes" -cp "$PLATFORM/android.jar" @"$STAGE/sources.txt"
 
-# ApkCheck (the package/certificate comparison that gates every install) is
-# unit-tested on the host JDK against the vectors the Rust mirror uses too; the
-# test is not in the APK.
+# The kit's ApkCheck (the package/certificate comparison that gates every install,
+# tested against the vectors the kit's Rust mirror uses too) and RedirectRule (which
+# redirects a download may follow) are unit-tested on the host JDK; the tests are
+# not in the APK.
 command -v java >/dev/null || { echo "ERROR: java not on PATH (a JDK is needed)" >&2; exit 1; }
 javac --release 11 -Xlint:all -d "$STAGE/test-classes" \
-    "$ANDROID_DIR/java/org/decented/stampede/ApkCheck.java" \
-    "$ANDROID_DIR/test/org/decented/stampede/ApkCheckTest.java"
-java -cp "$STAGE/test-classes" org.decented.stampede.ApkCheckTest "$ANDROID_DIR/test/apk-check-vectors.tsv"
+    "$KIT/android/java/dev/forgesworn/release/ApkCheck.java" \
+    "$KIT/android/test/dev/forgesworn/release/ApkCheckTest.java" \
+    "$KIT/android/java/dev/forgesworn/release/RedirectRule.java" \
+    "$KIT/android/test/dev/forgesworn/release/RedirectRuleTest.java"
+java -cp "$STAGE/test-classes" dev.forgesworn.release.ApkCheckTest "$KIT/vectors/apk-check-vectors.tsv"
+java -cp "$STAGE/test-classes" dev.forgesworn.release.RedirectRuleTest
 
 D8_MODE=--release
 [ "$DIAG" = "1" ] && D8_MODE=--debug
@@ -204,4 +219,4 @@ echo "BUILT: $APK ($(du -h "$APK" | cut -f1))"
 echo
 echo "  adb install -r $OUT/stampede.apk"
 echo "  adb shell am start -n $APP_ID/.StampedeActivity"
-echo "  adb logcat -s stampede:V"
+echo "  adb logcat -s stampede:V release-kit:V"
