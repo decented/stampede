@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 race-session = { path = "../race-session", default-features = false, features = ["authority"] }
-fray-session = { path = "../../../forgesworn/fray/crates/fray-session", default-features = false, features = ["authority"] }
+fray-session = { git = "https://github.com/forgesworn/fray", rev = "4943413bb86a329c3ad9cc3180c02fd9186ef2ce", default-features = false, features = ["authority"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wit-bindgen = "=0.62.0"
@@ -24,7 +24,10 @@ race-core = { path = "../race-core", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 bincode = { version = "1.3", optional = true }
-decented-net = { package = "fray-net", path = "../../../forgesworn/fray/crates/decented-net", optional = true }
+decented-net = { package = "fray-net", git = "https://github.com/forgesworn/fray", rev = "4943413bb86a329c3ad9cc3180c02fd9186ef2ce", optional = true }
+
+[dev-dependencies]
+sha2 = "0.10"
 
 [features]
 qualification = ["race-session/native", "dep:anyhow", "dep:wasmtime", "dep:wit-component", "dep:wasmparser", "dep:race-core", "dep:serde", "dep:serde_json", "dep:bincode", "dep:decented-net"]

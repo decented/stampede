@@ -11,7 +11,7 @@ use wasmtime::component::{Component, Linker};
 use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder};
 
 wasmtime::component::bindgen!({
-    path: "../../../forgesworn/fray/crates/fray-session/wit",
+    path: "wit",
     world: "game-authority",
 });
 pub(crate) use exports::fray::authority::authority as w;

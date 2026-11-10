@@ -6,16 +6,17 @@ App shell API: [docs/api/app-shell.md](docs/api/app-shell.md).
 
 ## Source dependencies
 
-The workspace uses sibling source checkouts as path dependencies. Before
-building, provide `../forgesworn/fray` (the `fray-net` and `fray-relays`
-crates) and `../TwangThang` (the `decented-signet` crate and its path
-dependencies). These sources are not bundled with this repository.
-`Cargo.lock` pins the external registry dependencies.
-
-One ForgeSworn library comes in as a git dependency pinned by revision in
-`app/Cargo.toml`, so cargo fetches it itself:
+The public libraries Stampede builds on come in as git dependencies pinned by
+revision, so cargo fetches them itself and no sibling checkout is needed to
+build or test: [fray](https://github.com/forgesworn/fray) (`fray-session`,
+`fray-net`, `fray-relays`, `fray-keep`; every fray crate must use the same
+revision, or cargo builds two copies whose types don't match),
+[signet-play](https://github.com/forgesworn/signet-play) (`decented-signet`,
+the sign-in layer) and
 [nostr-release-kit](https://github.com/forgesworn/nostr-release-kit) (in-app
-updates, More games and the release publisher). Building the APK also compiles
+updates, More games and the release publisher). `Cargo.lock` pins everything
+else. The authority guest's WIT contract is a byte copy of fray-session's, in
+`crates/race-authority/wit`. Building the APK also compiles
 the kit's Java, so `tools/build-apk.sh` needs a checkout of the kit at the pinned
 revision (`../forgesworn/nostr-release-kit` by default, or set `KIT`), and refuses
 any other revision. Releases are published with `tools/release/publish.sh`, which

@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 race-session = { path = "../../crates/race-session", default-features = false, features = ["authority"] }
-fray-session = { path = "../../../forgesworn/fray/crates/fray-session", default-features = false, features = ["authority"] }
+fray-session = { git = "https://github.com/forgesworn/fray", rev = "4943413bb86a329c3ad9cc3180c02fd9186ef2ce", default-features = false, features = ["authority"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wit-bindgen = "=0.62.0"

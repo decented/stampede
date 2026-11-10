@@ -82,6 +82,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 [[package]]
 name = "fray-session"
 version = "0.1.0"
+source = "git+https://github.com/forgesworn/fray?rev=4943413bb86a329c3ad9cc3180c02fd9186ef2ce#4943413bb86a329c3ad9cc3180c02fd9186ef2ce"
 dependencies = [
  "serde",
  "sha2",
