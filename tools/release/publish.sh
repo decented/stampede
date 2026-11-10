@@ -18,4 +18,7 @@ KIT="${KIT:-$HERE/../../../forgesworn/nostr-release-kit}"
 KIT_REV="$(grep -o 'nostr-release-kit", rev = "[0-9a-f]*' "$HERE/../../app/Cargo.toml" | head -1 | grep -o '[0-9a-f]*$')"
 KIT_HEAD="$(git -C "$KIT" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$KIT_REV" ] && [ "$KIT_HEAD" = "$KIT_REV" ] || { echo "ERROR: $KIT is at ${KIT_HEAD:-?}, app/Cargo.toml pins nostr-release-kit $KIT_REV (git -C \"$KIT\" checkout $KIT_REV)" >&2; exit 1; }
+# ...and match it exactly: no uncommitted or untracked files in the parts of the kit this uses.
+KIT_DIRTY="$(git -C "$KIT" status --porcelain -- android vectors tools 2>&1 || echo "git status failed")"
+[ -z "$KIT_DIRTY" ] || { printf 'ERROR: %s has local changes; build only from a clean checkout of %s:\n%s\n' "$KIT" "$KIT_REV" "$KIT_DIRTY" >&2; exit 1; }
 exec node "$KIT/tools/publish-release.mjs" --config "$HERE/release.json" "$@"
