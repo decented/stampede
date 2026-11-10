@@ -12,6 +12,15 @@ crates) and `../TwangThang` (the `decented-signet` crate and its path
 dependencies). These sources are not bundled with this repository.
 `Cargo.lock` pins the external registry dependencies.
 
+One ForgeSworn library comes in as a git dependency pinned by revision in
+`app/Cargo.toml`, so cargo fetches it itself:
+[nostr-release-kit](https://github.com/forgesworn/nostr-release-kit) (in-app
+updates, More games and the release publisher). Building the APK also compiles
+the kit's Java, so `tools/build-apk.sh` needs a checkout of the kit at the pinned
+revision (`../forgesworn/nostr-release-kit` by default, or set `KIT`), and refuses
+any other revision. Releases are published with `tools/release/publish.sh`, which
+runs the kit's publisher with `tools/release/release.json`.
+
 ## Desktop
 
 ```sh
