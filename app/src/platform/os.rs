@@ -104,9 +104,13 @@ fn pipe_to(cmd: &str, args: &[&str], text: &str) -> Result<(), String> {
     Ok(())
 }
 
-// Desktop cannot install an APK: the kit's defaults.
+// Desktop cannot install an APK: the kit's defaults, and no package name to check.
 #[cfg(not(target_os = "android"))]
-impl ApkInstaller for DesktopPlatform {}
+impl ApkInstaller for DesktopPlatform {
+    fn running_package(&mut self) -> Option<String> {
+        None
+    }
+}
 
 #[cfg(not(target_os = "android"))]
 impl Platform for DesktopPlatform {
