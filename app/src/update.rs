@@ -6,7 +6,7 @@
 //! to download it (canonical Blossom URLs only). The app:
 //!
 //! 1. reads the events from the player's relays (in their order) and the
-//!    release relays (relay.trotters.cc, relay.damus.io, nos.lol), all at
+//!    release relays (relay.damus.io, nos.lol, relay.primal.net), all at
 //!    once, 8 s, at launch if the last check is 6 h old, or when the
 //!    player taps "Check for updates" (never while [`RELEASE_PUBKEY_HEX`] is
 //!    `None`: no key pinned, no check, no network);
@@ -39,7 +39,8 @@ pub const RELEASE_KIND: u16 = 30063;
 /// The `d` tag of this app's Android channel.
 pub const RELEASE_CHANNEL: &str = "stampede-android-apk";
 /// Read for the release event; also what `publish-release.mjs` writes to.
-pub const RELEASE_RELAYS: [&str; 3] = ["wss://relay.trotters.cc", "wss://relay.damus.io", "wss://nos.lol"];
+/// Public relays only: the operator's own relay is never a default.
+pub const RELEASE_RELAYS: [&str; 3] = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"];
 /// The release key's public half (npub1ka2v5p8ansyaz7uwzgu5aan4g3r4qfdug34vpe2jvavgcgcj3z5qqa984j),
 /// Stampede's own (one release key per game). `None` would disable update checks.
 /// Rotating it later means shipping a new APK by hand: there is no in-band
@@ -1161,10 +1162,10 @@ mod tests {
         let base: Vec<String> = RELEASE_RELAYS.iter().map(|s| s.to_string()).collect();
         assert_eq!(u.check_relays(), base, "no own relays: the release relays only");
         // Own relays are added; one that is a release relay in another spelling is not repeated.
-        u.set_user_relays(vec!["wss://relay.damus.io".into(), "wss://NOS.LOL:443/".into(), "wss://mine.example.com".into(), "wss://relay.primal.net".into(), "wss://mine.example.com/".into()]);
+        u.set_user_relays(vec!["wss://relay.damus.io".into(), "wss://NOS.LOL:443/".into(), "wss://mine.example.com".into(), "wss://relay.example.org".into(), "wss://mine.example.com/".into()]);
         let got = u.check_relays();
         // Order: the player's own, in their order; then the release relays they did not list.
-        assert_eq!(got, vec!["wss://relay.damus.io".to_string(), "wss://NOS.LOL:443/".to_string(), "wss://mine.example.com".to_string(), "wss://relay.primal.net".to_string(), "wss://relay.trotters.cc".to_string()]);
+        assert_eq!(got, vec!["wss://relay.damus.io".to_string(), "wss://NOS.LOL:443/".to_string(), "wss://mine.example.com".to_string(), "wss://relay.example.org".to_string(), "wss://relay.primal.net".to_string()]);
         // Clearing the list goes back to the release relays.
         u.set_user_relays(Vec::new());
         assert_eq!(u.check_relays(), base);
@@ -1429,7 +1430,7 @@ mod tests {
     #[test]
     fn the_shipped_constants_are_stampedes_own() {
         assert_eq!(RELEASE_CHANNEL, "stampede-android-apk");
-        assert_eq!(RELEASE_RELAYS, ["wss://relay.trotters.cc", "wss://relay.damus.io", "wss://nos.lol"]);
+        assert_eq!(RELEASE_RELAYS, ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"]);
         // Twang Thang's release key is not Stampede's: it must never be pinned here.
         assert_ne!(RELEASE_PUBKEY_HEX, Some("2cc65a54774d9c1d6fde7e98255dbe1064940facb10dbc3e49f63300a27178c7"));
     }

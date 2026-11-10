@@ -6,7 +6,8 @@
 // is the source of truth for which pubkey is trusted; publish-release.mjs
 // checks the key it loads against that constant before it signs anything.
 export const SOFTWARE_RELEASE_KIND = 30063;
-export const RELEASE_RELAYS = ['wss://relay.trotters.cc', 'wss://relay.damus.io', 'wss://nos.lol'];
+// Public relays only: the operator's own relay is never a default.
+export const RELEASE_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
 export const RELEASE_CHANNEL = 'stampede-android-apk';
 /** BUD-02 Blossom upload authorization kind. */
 export const BLOSSOM_AUTH_KIND = 24242;
