@@ -86,7 +86,7 @@ pub struct Ctx<'a> {
     /// The app's online session (lobby, race, results, join); see `crate::online`.
     pub online: &'a crate::online::OnlineSlot,
     /// In-app updates, and the download / install path More games shares.
-    pub updates: &'a mut crate::update::Updater,
+    pub updates: &'a mut nostr_release_kit::Updater,
     pub account: &'a mut Option<crate::account::Account>,
 }
 

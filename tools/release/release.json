@@ -1,0 +1,12 @@
+{
+  "channel": "stampede-android-apk",
+  "package": "org.decented.stampede",
+  "expected_cert_sha256": "eacd24505a50630e2a115226fe592518bc16cc2421cfc019372b58baeaf08aa9",
+  "release_pubkey": "b754ca04fd9c09d17b8e12394ef67544475025bc446ac0e55267588c231288a8",
+  "key_file_env": "STAMPEDE_RELEASE_KEY_FILE",
+  "key_file": "~/.stampede-release/release-key.hex",
+  "relays": ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"],
+  "mirrors": ["https://nostr.download"],
+  "version_source": "semver",
+  "blossom_note": "Stampede release artifact upload"
+}

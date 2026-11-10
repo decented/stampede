@@ -15,6 +15,9 @@ gameplay; they should not need to touch `platform/`, `app.rs` or `render/`.
 | `shot.rs` | headless screenshot mode |
 | `render/` | `Gpu`, `EguiPainter`, `capture` (offscreen + PNG), `perf::FrameStats`, `ScenePass`, `encode_frame` |
 | `platform/` | `lifecycle`, `viewport` (UI scale, `Insets`, `Viewport`), `touch` (`Touches`, `Keys`), `tilt` (motion steering), `os` (`Platform` trait), `data_dir` (`Profile`), `android` (JNI) |
+| `release.rs` | Stampede's values for the release kit (`nostr-release-kit`): `RELEASE_CHANNEL`, `RELEASE_RELAYS`, `RELEASE_PUBKEY_HEX`, `OWN_PACKAGE`, and the `Config` / `CatalogConfig` the engine builds from them (`update_config`, `catalog_config`). The in-app updater is the kit's `Updater` (on `Ctx::updates`): checks one signed kind-30063 release event per launch, downloads and verifies the APK, hands it to Android's installer. The pins are tested there; `tools/release/release.json` (the kit publisher's config, run by `tools/release/publish.sh`) must agree |
+| `games.rs`, `nostr_fetch.rs` | More games: the built-in `CATALOG_ENTRIES` and icons (the kit's `Catalog` is built from them) and the one-shot relay reader (`AppFetcher`, the kit's `ReleaseFetcher`) both features use |
+| `platform/os.rs` | the kit's `ApkInstaller` is a supertrait of `Platform`: desktop has the "cannot" defaults, `RecordingPlatform` wraps the kit's `RecordingInstaller`, Android delegates to the kit's `android::AndroidInstaller` (Java: `dev.forgesworn.release.Updater`, compiled in by `tools/build-apk.sh`) |
 | `haptics/` | `Haptics`, `Pulse`; Android vibrator over JNI |
 | `ui/theme.rs` | palette (SPEC 13), fonts, `install` |
 | `ui/screens/` | `Screen`, `Transition`, `Router`, `Ctx`, registry `SCREENS`; `splash`, `home` (placeholders) |

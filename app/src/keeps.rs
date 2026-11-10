@@ -90,7 +90,7 @@ pub fn forget_saved(dir: &Path, host_key: &str) -> Result<(), String> {
 
 /// Seconds since the Unix epoch.
 pub fn unix_now() -> u64 {
-    crate::update::unix_now()
+    nostr_release_kit::updater::unix_now()
 }
 
 // ─── What a link or a paste asks for ────────────────────────────────────────
