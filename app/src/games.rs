@@ -12,17 +12,30 @@ use nostr_release_kit::CatalogEntry;
 
 /// Stampede's catalog. It omits Stampede itself. Keep the manifest `<queries>`
 /// in step. Order: as shown (and as [`ICONS`]).
-pub const CATALOG_ENTRIES: &[CatalogEntry] = &[CatalogEntry {
-    name: "Twang Thang",
-    blurb: "A neon energy-band party game.",
-    package: "org.decented.twangthang",
-    channel: "twangthang-android-apk",
-    release_pubkey: Some("2cc65a54774d9c1d6fde7e98255dbe1064940facb10dbc3e49f63300a27178c7"),
-    cert: Some("ad02f430148557fb6501c97b16a9ef60681d12d533f7579035e6d62a83dec640"),
-}];
+pub const CATALOG_ENTRIES: &[CatalogEntry] = &[
+    CatalogEntry {
+        name: "Twang Thang",
+        blurb: "A neon energy-band party game.",
+        package: "org.decented.twangthang",
+        channel: "twangthang-android-apk",
+        release_pubkey: Some("2cc65a54774d9c1d6fde7e98255dbe1064940facb10dbc3e49f63300a27178c7"),
+        cert: Some("ad02f430148557fb6501c97b16a9ef60681d12d533f7579035e6d62a83dec640"),
+    },
+    CatalogEntry {
+        name: "Cluster Flock",
+        blurb: "Three-lane ostrich farm run, with ghost saboteurs.",
+        package: "org.decented.gameflock",
+        channel: "gameflock-android-apk",
+        // Cluster Flock's own release key and APK signing certificate, as its
+        // app/src/release.rs and tools/release/release.json pin them; the certificate
+        // was read off its 0.2.1 APK. Pinned 2026-11-11.
+        release_pubkey: Some("01b0f270e290f5cd48aa537392de04e4b22124c16d696de96158395a60343b0f"),
+        cert: Some("46fd4f7a80b700cd7d951c04e38fa3344405759d53d161de3e4dd06120fb3ace"),
+    },
+];
 
 /// The entries' icons (PNG, bundled in the app), indexed like [`CATALOG_ENTRIES`].
-pub const ICONS: [&[u8]; 1] = [include_bytes!("../assets/games/twangthang.png")];
+pub const ICONS: [&[u8]; 2] = [include_bytes!("../assets/games/twangthang.png"), include_bytes!("../assets/games/clusterflock.png")];
 
 #[cfg(test)]
 mod tests {
@@ -44,6 +57,14 @@ mod tests {
         assert_eq!(CATALOG_ENTRIES[0].cert, Some("ad02f430148557fb6501c97b16a9ef60681d12d533f7579035e6d62a83dec640"));
         assert_eq!(CATALOG_ENTRIES[0].name, "Twang Thang");
         assert_eq!(CATALOG_ENTRIES[0].blurb, "A neon energy-band party game.");
+        assert_eq!(CATALOG_ENTRIES[1].package, "org.decented.gameflock");
+        assert_eq!(CATALOG_ENTRIES[1].channel, "gameflock-android-apk");
+        assert_eq!(CATALOG_ENTRIES[1].release_pubkey, Some("01b0f270e290f5cd48aa537392de04e4b22124c16d696de96158395a60343b0f"));
+        assert_eq!(CATALOG_ENTRIES[1].cert, Some("46fd4f7a80b700cd7d951c04e38fa3344405759d53d161de3e4dd06120fb3ace"));
+        assert_eq!(CATALOG_ENTRIES[1].name, "Cluster Flock");
+        // Each game has its own release key: a shared one would let one game's
+        // release stand in for another's.
+        assert_ne!(CATALOG_ENTRIES[0].release_pubkey, CATALOG_ENTRIES[1].release_pubkey);
     }
 
     #[test]

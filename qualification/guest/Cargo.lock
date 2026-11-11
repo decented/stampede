@@ -217,7 +217,7 @@ dependencies = [
 
 [[package]]
 name = "race-authority"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "fray-session",
  "race-session",
@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "race-core"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "bincode",
  "glam",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "race-session"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "bincode",
  "fray-session",
