@@ -21,15 +21,12 @@ def main():
     if compiler != COMPILER:
         raise ValueError('compiler identity mismatch')
     target = Path(os.environ['CARGO_TARGET_DIR']).resolve()
-    fray = ROOT.parent / 'forgesworn/fray'
     mappings = [
         (Path.home(), '/build-home'),
         (Path(os.environ.get('CARGO_HOME', Path.home() / '.cargo')).resolve(), '/cargo'),
         (Path(os.environ.get('RUSTUP_HOME', Path.home() / '.rustup')).resolve(), '/rustup'),
         (ROOT.parent, '/sources'),
         (ROOT, '/sources/Stampede'),
-        (fray, '/sources/forgesworn/fray'),
-        (fray.resolve(), '/sources/forgesworn/fray'),
     ]
     flags = ['--remap-path-prefix=' + str(source) + '=' + destination for source, destination in mappings]
     env = dict(os.environ)

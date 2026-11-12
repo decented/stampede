@@ -1,14 +1,8 @@
 # Build the authority from public source
 
 The isolated guest manifest compiles the existing authority source directly.
-It needs only public Stampede and Fray checkouts in their conventional layout:
-
-```text
-sources/
-  Stampede/
-  forgesworn/fray/
-```
-
+It needs only a public Stampede checkout; Cargo fetches Fray from
+github.com/forgesworn/fray at the revision pinned in `qualification/guest/Cargo.toml`.
 The native application workspace has additional dependencies. These manifests
 do not require a Twang or Signet checkout and do not copy or replace game rules.
 Keep the isolated guest package version aligned with the main workspace.
