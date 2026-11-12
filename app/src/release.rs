@@ -190,6 +190,30 @@ mod tests {
         assert!(matches!(current.verdict(), Verdict::UpToDate));
     }
 
+    /// Twang Thang's own publisher signed this with a THROWAWAY key whose secret was discarded,
+    /// on its real channel and carrying its real pinned certificate.
+    const TWANG_EVENT: &str = r#"{"kind":30063,"created_at":1791721775,"tags":[["d","twangthang-android-apk"],["version","0.1.0"],["version_code","1000"],["x","2a6f9fe9a8233340827bb1851aeb02fee659c7060fa97d27a7352aa16763016a"],["size","9796461"],["cert","ad02f430148557fb6501c97b16a9ef60681d12d533f7579035e6d62a83dec640"],["url","https://nostr.download/2a6f9fe9a8233340827bb1851aeb02fee659c7060fa97d27a7352aa16763016a.apk"]],"content":"First in-app update release.","pubkey":"44e49e42cde28b3a1cb5d2b43fe7f3d3a2fd36bb977d1319c7d05a34f497c878","id":"e8867c4aa8ced84f3c676f4dea1636eaac658ee1682c160e82c02fb6ecdebb50","sig":"f9d4e55bac1bf7ef6258be3df0dbb4a67fdbea7f50cf3fbacd4ea2eec6defd0a39694c0c9568aeb7a9dd76d70bd72ff93ddd68c5ee6278483f859e4c4e0c453a"}"#;
+    const TWANG_TEST_PUBKEY: &str = "44e49e42cde28b3a1cb5d2b43fe7f3d3a2fd36bb977d1319c7d05a34f497c878";
+
+    #[test]
+    fn a_twang_release_event_is_judged_through_the_real_catalog() {
+        use nostr_release_kit::{EntryStatus, FetchReport};
+        let ev: Event = serde_json::from_str(TWANG_EVENT).unwrap();
+        let report = FetchReport { events: vec![ev], answered: 1, total: 3 };
+        // The shipped catalog pins other keys: nothing is offered, for Twang Thang or Cluster Flock.
+        let mut prod = catalog();
+        prod.apply_report(&report);
+        assert_eq!(prod.status(0), EntryStatus::NoRelease);
+        assert_eq!(prod.status(1), EntryStatus::NoRelease);
+        // With the throwaway key pinned in the otherwise real Twang Thang entry, the same event is a Get.
+        let mut cfg = catalog_config();
+        cfg.entries[0].release_pubkey = Some(TWANG_TEST_PUBKEY);
+        let mut pinned = Catalog::new(cfg, Box::new(AppFetcher));
+        pinned.apply_report(&report);
+        assert_eq!(pinned.status(0), EntryStatus::Get { version: "0.1.0".into(), size: 9_796_461 });
+        assert_eq!(pinned.status(1), EntryStatus::NoRelease);
+    }
+
     #[test]
     fn the_permission_line_names_stampede() {
         use nostr_release_kit::ApkStatus;
