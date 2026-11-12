@@ -19,7 +19,7 @@ path = "src/main.rs"
 # workspaces share CARGO_TARGET_DIR=~/.cache/twangthang-target, and equal
 # feature sets let the compiled wgpu/winit/egui artifacts be reused.
 [dependencies]
-decented-signet = { git = "https://github.com/forgesworn/signet-play", rev = "7385b50b85c86616a2b1e0eb58cc3adf56ae71e3" }
+decented-signet = { git = "https://github.com/forgesworn/signet-play", rev = "7594a05450e3224aa8fc464a6fd69f36a642d52f" }
 race-core = { path = "../crates/race-core" }
 race-render = { path = "../crates/race-render" }
 race-audio = { path = "../crates/race-audio" }
