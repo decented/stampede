@@ -18,7 +18,7 @@ use std::path::Path;
 pub const RELEASE_CHANNEL: &str = "stampede-android-apk";
 /// Read for the release event; also what the publisher writes to (`tools/release/release.json`).
 /// Public relays only: the operator's own relay is never a default.
-pub const RELEASE_RELAYS: [&str; 3] = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"];
+pub const RELEASE_RELAYS: [&str; 3] = ["wss://relay.damus.io", "wss://relay.ditto.pub", "wss://relay.primal.net"];
 /// The release key's public half (hex; npub1ka2v5p8ansyaz7uwzgu5aan4g3r4qfdug34vpe2jvavgcgcj3z5qqa984j),
 /// Stampede's own (one release key per game). The publisher refuses to sign with any
 /// other key. Rotating it later means shipping a new APK by hand: there is no in-band rotation.
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn the_shipped_constants_are_stampedes_own() {
         assert_eq!(RELEASE_CHANNEL, "stampede-android-apk");
-        assert_eq!(RELEASE_RELAYS, ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"]);
+        assert_eq!(RELEASE_RELAYS, ["wss://relay.damus.io", "wss://relay.ditto.pub", "wss://relay.primal.net"]);
         assert_eq!(OWN_PACKAGE, "org.decented.stampede");
         assert_eq!(APP_NAME, "Stampede");
         assert_eq!(RELEASE_PUBKEY_HEX, "b754ca04fd9c09d17b8e12394ef67544475025bc446ac0e55267588c231288a8");
