@@ -1613,7 +1613,7 @@ mod tests {
         ] {
             assert!(is_lan_ip(ok.parse().unwrap()), "{ok}");
         }
-        for bad in ["8.8.8.8", "100.85.0.1", "2001:db8::1", "0.0.0.0"] {
+        for bad in ["8.8.8.8", "100.64.0.1", "2001:db8::1", "0.0.0.0"] {
             assert!(!is_lan_ip(bad.parse().unwrap()), "{bad}");
         }
     }
