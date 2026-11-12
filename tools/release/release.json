@@ -5,7 +5,7 @@
   "release_pubkey": "b754ca04fd9c09d17b8e12394ef67544475025bc446ac0e55267588c231288a8",
   "key_file_env": "STAMPEDE_RELEASE_KEY_FILE",
   "key_file": "~/.stampede-release/release-key.hex",
-  "relays": ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"],
+  "relays": ["wss://relay.damus.io", "wss://relay.ditto.pub", "wss://relay.primal.net"],
   "mirrors": ["https://nostr.download"],
   "version_source": "semver",
   "blossom_note": "Stampede release artifact upload"
