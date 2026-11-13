@@ -1270,6 +1270,16 @@ fn dial_info(host: &OnlineSession) -> (std::net::SocketAddr, String, String) {
         .unwrap()
 }
 
+thread_local! {
+    /// The longest gap between two pump rounds of `run_until` on this test's
+    /// thread. A stall the test did not stage (a starved machine) shows here.
+    static LONGEST_GAP: Cell<Duration> = const { Cell::new(Duration::ZERO) };
+}
+
+fn longest_gap_ms() -> u128 {
+    LONGEST_GAP.with(|g| g.get().as_millis())
+}
+
 /// Pump the phones that are alive (`alive[i]`), one frame each, until `cond`.
 pub(crate) fn run_until(
     phones: &mut [OnlineSession],
@@ -1279,6 +1289,7 @@ pub(crate) fn run_until(
     mut cond: impl FnMut(&[OnlineSession]) -> bool,
 ) {
     let t = Instant::now();
+    let mut last = t;
     while !cond(phones) {
         for (p, on) in phones.iter_mut().zip(alive) {
             if *on {
@@ -1288,9 +1299,13 @@ pub(crate) fn run_until(
                 p.pump_background();
             }
         }
+        let now = Instant::now();
+        LONGEST_GAP.with(|g| g.set(g.get().max(now - last)));
+        last = now;
         assert!(
             t.elapsed() < Duration::from_secs(secs),
-            "timed out ({secs} s) waiting for: {what}; states {:?}; dead {:?}",
+            "timed out ({secs} s) waiting for: {what}; longest pump gap {} ms; states {:?}; dead {:?}",
+            longest_gap_ms(),
             phones
                 .iter()
                 .map(|p| p.migration_state())
@@ -1762,8 +1777,9 @@ fn a_backup_stall_past_the_skew_budget_soft_pauses_the_host_and_play_goes_on() {
     }
     assert!(
         is_armed(&phones[0].migration_state()),
-        "the host plays on armed: {:?} after {host:?}",
-        phones[0].migration_state()
+        "the host plays on armed: {:?} after {host:?} (longest pump gap {} ms)",
+        phones[0].migration_state(),
+        longest_gap_ms()
     );
     assert!(
         is_armed(&phones[1].migration_state()),
@@ -2046,9 +2062,10 @@ fn the_standby_players_leave_keeps_the_standby_and_a_seatless_takeover_resumes_s
     run_until(&mut phones, &all, 10, "play goes on", |p| {
         assert!(
             is_armed(&p[0].migration_state()) && is_armed(&p[2].migration_state()),
-            "the room stopped playing armed: {:?} / {:?}",
+            "the room stopped playing armed: {:?} / {:?} (longest pump gap {} ms)",
             p[0].migration_state(),
-            p[2].migration_state()
+            p[2].migration_state(),
+            longest_gap_ms()
         );
         t.elapsed() > Duration::from_millis(1500)
     });
@@ -2171,7 +2188,8 @@ fn a_standby_whose_own_redial_fails_after_the_pin_keeps_the_room_armed_and_takes
         let host = p[0].migration_state();
         assert!(
             matches!(&host, MigrationState::Armed { unprotected } if unprotected.len() == 1),
-            "the host stopped playing armed: {host:?}"
+            "the host stopped playing armed: {host:?} (longest pump gap {} ms)",
+            longest_gap_ms()
         );
         assert!(
             is_armed(&p[2].migration_state()),
@@ -2340,7 +2358,8 @@ fn a_standby_whose_watch_is_stale_when_its_redial_fails_holds_and_is_kept() {
         host_states.contains(&MigrationState::Paused {
             reason: BACKUP_LOST.into()
         }),
-        "the host never paused"
+        "the host never paused (longest pump gap {} ms)",
+        longest_gap_ms()
     );
     // The outage can also leave the host's game clock held at its budget, so
     // the soft behind pause may show as it clears; no other reason may.
@@ -2355,7 +2374,8 @@ fn a_standby_whose_watch_is_stale_when_its_redial_fails_holds_and_is_kept() {
         let host = p[0].migration_state();
         assert!(
             matches!(&host, MigrationState::Armed { unprotected } if unprotected.len() == 1),
-            "the host stopped playing armed: {host:?}"
+            "the host stopped playing armed: {host:?} (longest pump gap {} ms)",
+            longest_gap_ms()
         );
         assert!(
             matches!(p[1].role, Role::Standby(_)),
