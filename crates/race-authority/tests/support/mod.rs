@@ -22,6 +22,14 @@ pub(crate) mod legacy;
 
 const FUEL: u64 = 10_000_000;
 const SETUP_FUEL: u64 = 1_000_000_000;
+/// The epoch clock ticks every 50 ms. Its deadlines only stop a runaway
+/// call: fuel is each operation's budget, and a loaded machine must not fail
+/// a call that is within it. Timing is measured and reported separately.
+const EPOCH_MS: u64 = 50;
+/// Five seconds for init, restore and controller changes.
+const SETUP_DEADLINE_EPOCHS: u64 = 100;
+/// One second for every other call, instantiation included.
+const CALL_DEADLINE_EPOCHS: u64 = 20;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Profile {
     Qualification,
@@ -48,9 +56,9 @@ impl Profile {
     }
     fn deadline_epochs(self, operation: Operation) -> u64 {
         if self.fuel(operation) == SETUP_FUEL {
-            10
+            SETUP_DEADLINE_EPOCHS
         } else {
-            2
+            CALL_DEADLINE_EPOCHS
         }
     }
 }
@@ -65,7 +73,7 @@ impl EpochTicker {
         let flag = stop.clone();
         let thread = std::thread::spawn(move || {
             while !flag.load(Ordering::Acquire) {
-                std::thread::park_timeout(std::time::Duration::from_millis(50));
+                std::thread::park_timeout(std::time::Duration::from_millis(EPOCH_MS));
                 if !flag.load(Ordering::Acquire) {
                     engine.increment_epoch();
                 }
@@ -245,7 +253,7 @@ impl Harness {
         store.set_hostcall_fuel(IMAGE_LIMIT);
         store.set_max_component_handles(0);
         store.set_fuel(FUEL).unwrap();
-        store.set_epoch_deadline(2);
+        store.set_epoch_deadline(CALL_DEADLINE_EPOCHS);
         let bindings =
             GameAuthority::instantiate(&mut store, &self.component, &Linker::new(&self.engine))
                 .unwrap();

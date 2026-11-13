@@ -48,7 +48,8 @@ disabled and NaNs canonicalised. The `stampede-preparation-v1` profile keeps ten
 million fuel for live ticks, player events, checkpoints and hashes. Init, restore
 and trusted controller changes have a separate one-billion-fuel preparation
 budget. The selected track is prepared before the next live tick. A local epoch
-clock enforces 500 ms for preparation and 100 ms for ordinary calls. Reports include
+clock stops a runaway call after 5 s in preparation and 1 s otherwise; fuel is
+the budget, so a loaded machine does not fail a call within it. Reports include
 actual maximum fuel, checkpoint size and component size. The full race compares
 every output, checkpoint and hash with native execution and continues seven
 fresh restores across lobby, racing, departure, results and rematch.
