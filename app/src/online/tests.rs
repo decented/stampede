@@ -1818,8 +1818,9 @@ fn a_backup_stall_past_the_skew_budget_soft_pauses_the_host_and_play_goes_on() {
 /// commit if the batch waited for the next poll), each up to 50 ms of game
 /// time. So when the frames hold their rate the lobby's game time keeps up
 /// with real time and the host never shows the behind pause. A loaded
-/// machine that cannot hold the frame rate checks only the commits per
-/// frame (some receipts then miss the next frame, so the bound has slack).
+/// machine that cannot hold the frame rate (on average, or with any two
+/// pumps more than two frames apart) checks only the commits per frame (some
+/// receipts then miss the next frame, so the bound has slack).
 #[test]
 fn an_armed_lobby_at_33_ms_frames_commits_every_frame_and_keeps_real_time() {
     let mut seen = Seen::default();
@@ -1827,21 +1828,27 @@ fn an_armed_lobby_at_33_ms_frames_commits_every_frame_and_keeps_real_time() {
     /// Every phone for `span` of real time, one frame each per `frame`,
     /// the host first and the others half a frame later (two phones' frames
     /// fall at independent phases). `each` sees the phones after every host
-    /// frame.
+    /// frame. Returns the longest time between two pumps (half a frame when
+    /// the rate holds).
     fn paced(
         phones: &mut [OnlineSession],
         frame: Duration,
         span: Duration,
         mut each: impl FnMut(&[OnlineSession]),
-    ) {
+    ) -> Duration {
         let start = Instant::now();
         let mut next = start;
+        let (mut last, mut gap) = (start, Duration::ZERO);
         while start.elapsed() < span {
+            gap = gap.max(last.elapsed());
+            last = Instant::now();
             let input = phones[0].bot_drive();
             phones[0].pump(input);
             phones[0].pump_background();
             each(phones);
             std::thread::sleep((next + frame / 2).saturating_duration_since(Instant::now()));
+            gap = gap.max(last.elapsed());
+            last = Instant::now();
             for p in &mut phones[1..] {
                 let input = p.bot_drive();
                 p.pump(input);
@@ -1851,6 +1858,7 @@ fn an_armed_lobby_at_33_ms_frames_commits_every_frame_and_keeps_real_time() {
             next = (next + frame).max(Instant::now());
             std::thread::sleep(next.saturating_duration_since(Instant::now()));
         }
+        gap
     }
     let frame = Duration::from_millis(33);
     // A second to settle into the paced cycle, then four measured.
@@ -1863,16 +1871,17 @@ fn an_armed_lobby_at_33_ms_frames_commits_every_frame_and_keeps_real_time() {
     let (index, logical) = committed(&phones[0]);
     let (mut frames, mut behind_frames) = (0u64, 0u64);
     let t = Instant::now();
-    paced(&mut phones, frame, Duration::from_secs(4), |p| {
+    let gap = paced(&mut phones, frame, Duration::from_secs(4), |p| {
         frames += 1;
         behind_frames += u64::from(p[0].role.host_behind());
     });
     let wall = t.elapsed().as_millis() as u64;
     let (last, now) = committed(&phones[0]);
     let (commits, game) = (last - index, now - logical);
-    let held = frames * 40 >= wall;
+    let held = frames * 40 >= wall && gap <= frame * 2;
     println!(
-        "STAMPEDE ARMED LOBBY 33 MS wall_ms={wall} game_ms={game} host_frames={frames} commits={commits} behind_frames={behind_frames} frame_rate_held={held}"
+        "STAMPEDE ARMED LOBBY 33 MS wall_ms={wall} game_ms={game} host_frames={frames} commits={commits} behind_frames={behind_frames} longest_pump_gap_ms={} frame_rate_held={held}",
+        gap.as_millis()
     );
     assert!(
         !matches!(phones[0].migration_state(), MigrationState::Paused { reason } if reason != BEHIND),
