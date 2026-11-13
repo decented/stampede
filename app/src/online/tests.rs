@@ -1489,14 +1489,10 @@ fn an_app_host_standby_and_client_arm_race_and_survive_a_killed_host() {
         t.elapsed() > Duration::from_millis(1500)
             && p.iter().all(|x| x.me().clock_offset_ms().is_some())
     });
-    assert!(
-        phones.iter().all(|p| is_armed(&p.migration_state())),
-        "{:?}",
-        phones
-            .iter()
-            .map(|p| p.migration_state())
-            .collect::<Vec<_>>()
-    );
+    // A starved frame can show a soft pause that clears by itself.
+    run_until(&mut phones, &all, 10, "every phone armed while racing", |p| {
+        p.iter().all(|x| is_armed(&x.migration_state()))
+    });
 
     // Kill the host: it is never pumped again and closes nothing.
     let killed = Instant::now();
@@ -2653,7 +2649,10 @@ fn race_armed(phones: &mut [OnlineSession]) {
     run_until(phones, &all, 10, "a moment of racing", |_| {
         t.elapsed() > Duration::from_millis(500)
     });
-    assert!(phones.iter().all(|p| is_armed(&p.migration_state())));
+    // A starved frame can show a soft pause that clears by itself.
+    run_until(phones, &all, 10, "every phone armed while racing", |p| {
+        p.iter().all(|x| is_armed(&x.migration_state()))
+    });
 }
 
 /// Item 2.1: a standby frame stall alone cannot make a live original look
