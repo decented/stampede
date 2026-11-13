@@ -14,6 +14,10 @@ use egui::{pos2, vec2, Align2, Color32, Rect, Sense, Stroke};
 
 /// Height of one game's card.
 const CARD_H: f32 = 108.0;
+/// The shortest a landscape card gets while shrinking so every game fits the screen (a card
+/// that does not fit whole is not drawn until a drag brings it in). The status line and the
+/// download track still clear each other at this height.
+const CARD_MIN_H: f32 = 96.0;
 
 /// A staged state for screenshots.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -192,7 +196,8 @@ impl Screen for GamesScreen {
             }
             let body = hd.body;
             let portrait = common::Layout::new(safe).portrait;
-            let card_h = if portrait { 210.0 } else { CARD_H };
+            let n = entries.len().max(1) as f32;
+            let card_h = if portrait { 210.0 } else { (body.height() / n - S2).clamp(CARD_MIN_H, CARD_H) };
             let total = entries.len() as f32 * (card_h + S2);
             let max_scroll = (total - body.height()).max(0.0);
             let drag = ui.interact(body, egui::Id::new("games-scroll"), Sense::drag());
