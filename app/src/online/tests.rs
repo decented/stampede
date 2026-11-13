@@ -1215,7 +1215,25 @@ fn approved() -> Identity {
     runtime.with_attestation(serde_json::to_string(&event).unwrap())
 }
 
+/// One real-QUIC room at a time in this test binary. Each armed test drives
+/// its phones from one thread against the room's real-time budgets (the
+/// 250 ms game-clock skew, the backup's watch), so rooms side by side on a
+/// loaded machine starve one another into pauses and takeovers the test did
+/// not stage. The first `lan_cfg` on a test's thread takes the turn; it is
+/// held until that thread ends, after the test's phones have dropped.
+static ONE_ROOM: std::sync::Mutex<()> = std::sync::Mutex::new(());
+thread_local! {
+    static ROOM_TURN: std::cell::RefCell<Option<std::sync::MutexGuard<'static, ()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 fn lan_cfg() -> NetConfig {
+    ROOM_TURN.with(|turn| {
+        let mut turn = turn.borrow_mut();
+        if turn.is_none() {
+            *turn = Some(ONE_ROOM.lock().unwrap_or_else(|e| e.into_inner()));
+        }
+    });
     NetConfig::new(
         std::env::temp_dir().join(format!("stampede-app-armed-{}", std::process::id())),
         race_session::APP_TAG,
