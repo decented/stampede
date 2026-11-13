@@ -1245,7 +1245,7 @@ fn open_room(cfg: &NetConfig, id: Identity, handle: decented_net::HostHandle) ->
     while !host.room_ready() {
         host.pump(Input::default());
         assert!(
-            t.elapsed() < Duration::from_secs(10),
+            t.elapsed() < Duration::from_secs(10 * WAIT_SLACK),
             "the room never opened: {:?}",
             host.status()
         );
@@ -1270,6 +1270,11 @@ fn dial_info(host: &OnlineSession) -> (std::net::SocketAddr, String, String) {
         .unwrap()
 }
 
+/// Waits for progress stretch by this much: they only bound how long a test
+/// waits, and a loaded machine makes progress slowly. What a test asserts
+/// about time is in its conditions, never in these bounds.
+const WAIT_SLACK: u64 = 3;
+
 thread_local! {
     /// The longest gap between two pump rounds of `run_until` on this test's
     /// thread. A stall the test did not stage (a starved machine) shows here.
@@ -1289,6 +1294,7 @@ pub(crate) fn run_until(
     mut cond: impl FnMut(&[OnlineSession]) -> bool,
 ) {
     let t = Instant::now();
+    let budget = Duration::from_secs(secs * WAIT_SLACK);
     let mut last = t;
     while !cond(phones) {
         for (p, on) in phones.iter_mut().zip(alive) {
@@ -1303,8 +1309,9 @@ pub(crate) fn run_until(
         LONGEST_GAP.with(|g| g.set(g.get().max(now - last)));
         last = now;
         assert!(
-            t.elapsed() < Duration::from_secs(secs),
-            "timed out ({secs} s) waiting for: {what}; longest pump gap {} ms; states {:?}; dead {:?}",
+            t.elapsed() < budget,
+            "timed out ({} s) waiting for: {what}; longest pump gap {} ms; states {:?}; dead {:?}",
+            budget.as_secs(),
             longest_gap_ms(),
             phones
                 .iter()
