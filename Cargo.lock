@@ -3400,7 +3400,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "race-audio"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "log",
  "rodio",
@@ -3408,7 +3408,7 @@ dependencies = [
 
 [[package]]
 name = "race-authority"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3427,7 +3427,7 @@ dependencies = [
 
 [[package]]
 name = "race-core"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "bincode",
  "glam",
@@ -3440,7 +3440,7 @@ dependencies = [
 
 [[package]]
 name = "race-render"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "bytemuck",
  "glam",
@@ -3452,7 +3452,7 @@ dependencies = [
 
 [[package]]
 name = "race-session"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "bincode",
  "ctrlc",
@@ -4214,7 +4214,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "stampede"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "android-activity",
  "android_logger",
