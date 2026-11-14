@@ -124,15 +124,17 @@ mod tests {
         assert_eq!(c.entries, CATALOG_ENTRIES.to_vec());
         assert_eq!(c.relays, RELEASE_RELAYS.map(String::from).to_vec());
         let cat = catalog();
-        assert_eq!(cat.entries().len(), 2);
+        assert_eq!(cat.entries().len(), 3);
         // Every entry names a real package that is not this app's own, and none repeats.
         assert_eq!(c.validate(OWN_PACKAGE), Ok(()));
         let filters = cat.filters();
-        assert_eq!(filters.len(), 2, "one filter per ready entry");
+        assert_eq!(filters.len(), 3, "one filter per ready entry");
         let json = filters.iter().map(|f| f.as_json()).collect::<Vec<_>>().join(" ");
         assert!(json.contains(TWANG_KEY), "{json}");
         assert!(json.contains(CATALOG_ENTRIES[1].release_pubkey.unwrap()), "{json}");
+        assert!(json.contains(CATALOG_ENTRIES[2].release_pubkey.unwrap()), "{json}");
         assert!(json.contains("30063") && json.contains("twangthang-android-apk") && json.contains("gameflock-android-apk"), "{json}");
+        assert!(json.contains("axenstax-android-apk"), "{json}");
         assert!(!json.contains("stampede-android-apk"), "{json}");
     }
 
