@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/race-core", "crates/race-render", "crates/race-session", "crates/race-authority", "crates/race-audio", "app"]
 
 [workspace.package]
-version = "0.4.15"
+version = "0.4.16"
 edition = "2021"
 license = "MIT"
 authors = ["decented"]
