@@ -30,6 +30,7 @@ cargo run -p stampede                                 # 1600x720 window, starts 
 cargo run -p stampede -- --screen home                # skip the splash
 STAMPEDE_NO_VSYNC=1 cargo run -p stampede             # if frames stall ~1 s each (X11 Fifo)
 cargo test -p stampede
+cargo test -p stampede --lib an_armed_lobby_at_33_ms -- --ignored --test-threads=1   # real-time lobby check, on its own
 ```
 
 Keys: Esc = Back. Mouse: left button = a finger, right button = a second finger.

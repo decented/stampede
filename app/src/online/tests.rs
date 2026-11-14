@@ -1821,7 +1821,11 @@ fn a_backup_stall_past_the_skew_budget_soft_pauses_the_host_and_play_goes_on() {
 /// machine that cannot hold the frame rate (on average, or with any two
 /// pumps more than two frames apart) checks only the commits per frame (some
 /// receipts then miss the next frame, so the bound has slack).
+///
+/// Real time is what this checks, so it runs on its own: in the parallel run
+/// the other tests starve its network threads and the behind pause shows.
 #[test]
+#[ignore = "real time: run serially, cargo test -p stampede --lib an_armed_lobby_at_33_ms -- --ignored --test-threads=1"]
 fn an_armed_lobby_at_33_ms_frames_commits_every_frame_and_keeps_real_time() {
     let mut seen = Seen::default();
     let (mut phones, ..) = armed_room(&mut seen);
