@@ -52,7 +52,14 @@ pub struct LobbyScreen {
     protect_sheet: bool,
     saved_custom: Option<(u64, bool)>,
     sample_downloading: bool,
+    /// Screenshots: a guest of the Keep with this key (a real session proves it by its link).
+    sample_keep: Option<[u8; 32]>,
 }
+
+/// The guest panel's extra action in a room on a Keep: opens My Signet, where the Keep's owner invites.
+pub const KEEP_INVITE: &str = "Invite to this Keep";
+/// ...and the line beside it.
+pub const KEEP_INVITE_NOTE: &str = "Opens My Signet. Only the Keep's owner can invite.";
 
 impl Default for LobbyScreen {
     fn default() -> Self {
@@ -73,7 +80,7 @@ impl LobbyScreen {
 
     /// The lobby of the session in the app's slot.
     pub fn new() -> LobbyScreen {
-        LobbyScreen { staged: None, t: 0.0, sample: false, copied: 99.0, copied_link: false, open_host: false, mig_delay: Default::default(), had_session: false, sent_char: None, join_prompt: None, leaving: false, sample_battle: None, guest_view: false, picker: None, picker_scroll: 0.0, protect: None, protect_sheet: false, saved_custom: None, sample_downloading: false }
+        LobbyScreen { staged: None, t: 0.0, sample: false, copied: 99.0, copied_link: false, open_host: false, mig_delay: Default::default(), had_session: false, sent_char: None, join_prompt: None, leaving: false, sample_battle: None, guest_view: false, picker: None, picker_scroll: 0.0, protect: None, protect_sheet: false, saved_custom: None, sample_downloading: false, sample_keep: None }
     }
 
     /// The lobby of `s`, which it puts in the slot on its first frame.
@@ -130,6 +137,16 @@ impl LobbyScreen {
 
     pub fn custom_guest_sample() -> LobbyScreen {
         LobbyScreen { guest_view: true, ..Self::custom_host_sample() }
+    }
+
+    /// A guest in a room on a Keep (screenshots).
+    pub fn keep_guest_sample() -> LobbyScreen {
+        LobbyScreen { guest_view: true, sample_keep: Some([0xab; 32]), ..LobbyScreen::lobby_sample() }
+    }
+
+    /// ...and one on a custom track, which adds the Save button (screenshots).
+    pub fn keep_custom_guest_sample() -> LobbyScreen {
+        LobbyScreen { sample_keep: Some([0xab; 32]), ..Self::custom_guest_sample() }
     }
 
     pub fn custom_downloading_sample() -> LobbyScreen {
@@ -293,6 +310,8 @@ enum Act {
     Ostrich,
     Copy,
     Link,
+    /// "Invite to this Keep": open My Signet at the link.
+    KeepInvite,
     Track(i32),
     MyTracks,
     SaveTrack,
@@ -331,6 +350,8 @@ struct Snap {
     online_code: bool,
     /// The room is on this Wi-Fi only: no code to share.
     nearby_only: bool,
+    /// The My Signet link, in a room on a Keep (the key its join proved).
+    keep_link: Option<String>,
 }
 
 enum Next {
@@ -479,6 +500,7 @@ impl Screen for LobbyScreen {
             host_name: s.me().lobby().and_then(|l| l.seats.iter().find(|x| x.host)).map_or_else(|| "The host".to_string(), |h| h.name.clone()),
             online_code: s.has_online_code(),
             nearby_only: s.nearby_only(),
+            keep_link: self.sample_keep.or_else(|| s.keep_key()).and_then(|key| crate::keeps::keep_invite_link(&key)),
         }) else {
             // No session yet (a room being opened on the first frame): just the page.
             common::page(ctx.viewport.screen, tm, ui, 0.26, |ui, _| {
@@ -486,7 +508,7 @@ impl Screen for LobbyScreen {
             });
             return Transition::None;
         };
-        let Snap { is_host, lobby, my_seat, me_ready, code, room_status, code_ok: room_ok, rtt, custom, downloading, track_error, migration: mig, host_name, online_code, nearby_only } = snap;
+        let Snap { is_host, lobby, my_seat, me_ready, code, room_status, code_ok: room_ok, rtt, custom, downloading, track_error, migration: mig, host_name, online_code, nearby_only, keep_link } = snap;
         let (mig, can_protect) = self.migration_at(&mig, is_host, lobby.is_some(), decented_signet::sharing::now_ms());
         if !can_protect {
             self.protect_sheet = false;
@@ -577,7 +599,7 @@ impl Screen for LobbyScreen {
                 if is_host && !guest_view {
                     host_panel(ui, &p, inner, &code, &room_status, room_ok, nearby_only, copied, lobby.as_ref(), &mut acts);
                 } else {
-                    guest_panel(ui, &p, inner, lobby.as_ref(), rtt, connecting, downloading, track_error.as_deref(), saved, &mut acts);
+                    guest_panel(ui, &p, inner, lobby.as_ref(), rtt, connecting, downloading, track_error.as_deref(), saved, keep_link.is_some(), &mut acts);
                 }
             });
         });
@@ -664,6 +686,14 @@ impl Screen for LobbyScreen {
                         }
                         self.copied = 0.0;
                         self.copied_link = true;
+                    }
+                }
+                Act::KeepInvite => {
+                    feedback::tap(ctx);
+                    if let Some(link) = keep_link.as_ref() {
+                        if let Err(e) = ctx.platform.open_url(link) {
+                            ctx.say(format!("Couldn't open My Signet: {e}"));
+                        }
                     }
                 }
                 Act::Track(d) => {
@@ -883,7 +913,7 @@ fn settings_rows(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&rac
 }
 
 #[allow(clippy::too_many_arguments)]
-fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_session::LobbyView>, rtt: Option<u32>, connecting: bool, downloading: bool, track_error: Option<&str>, saved: bool, acts: &mut Vec<Act>) {
+fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_session::LobbyView>, rtt: Option<u32>, connecting: bool, downloading: bool, track_error: Option<&str>, saved: bool, keep: bool, acts: &mut Vec<Act>) {
     let _ = ui;
     let Some(l) = lobby else {
         p.text(inner.center(), Align2::CENTER_CENTER, "Joining...", theme::title(22.0), theme::TEXT_DIM);
@@ -901,6 +931,10 @@ fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_
         let info = tracks::info(l.battle.map_or(l.track, |b| b.arena));
         tracks::card(ui, card, "lobby-track", &info, false, None, None, false, 1.0);
     }
+    // On a Keep with a custom track there is one more action and the Save button too: the rows
+    // close up so both fit on the shortest phone.
+    let squeeze = keep && l.custom.is_some();
+    let (step, last) = if squeeze { (18.0, 22.0) } else { (22.0, 26.0) };
     let mut y = card.bottom() + 14.0;
     let line = |y: f32, a: &str, b: &str| {
         p.text(pos2(inner.left() + 2.0, y), Align2::LEFT_CENTER, a, theme::ui_bold(12.0), theme::SAND);
@@ -909,25 +943,48 @@ fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_
     match l.battle {
         Some(b) => {
             line(y, "Mode", "Battle (Feather Frenzy)");
-            y += 22.0;
+            y += step;
             line(y, "Rules", &format!("{} feathers, {} min", b.rules.feathers, b.rules.time_limit / 60))
         }
         None => line(y, "Laps", &format!("{}", l.laps)),
     }
-    y += 22.0;
+    y += step;
     let level = common::LEVELS[level_index(l.bot_level)].0;
     line(y, "Bots", &format!("{} ({level})", l.bots));
-    y += 22.0;
+    y += step;
     let q = online::quality(rtt);
     let col = [theme::MINT, theme::GOLD, Color32::from_rgb(0xFF, 0x5A, 0x4A)][q as usize];
     p.circle_filled(pos2(inner.left() + 7.0, y), 4.5, col);
     p.text(pos2(inner.left() + 18.0, y), Align2::LEFT_CENTER, "Connection", theme::ui_bold(12.0), theme::SAND);
     p.text(pos2(inner.right() - 2.0, y), Align2::RIGHT_CENTER, rtt.map(|r| format!("{r} ms")).unwrap_or_else(|| "--".into()), theme::ui_bold(12.5), theme::TEXT);
-    y += 26.0;
+    y += last;
+    let hint_y = y;
     p.text(pos2(inner.center().x, y), Align2::CENTER_CENTER, if l.battle.is_some() { "The battle starts when everyone is ready." } else { "The race starts when everyone is ready." }, theme::ui_medium(10.5), theme::TEXT_DIM);
+    let save_label = if saved { "Saved in My Tracks" } else { "Save to My Tracks" };
+    let note = |p: &Painter, r: Rect| {
+        let g = p.layout(KEEP_INVITE_NOTE.to_string(), theme::ui_medium(9.8), theme::TEXT_DIM, r.width());
+        p.galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, theme::TEXT_DIM);
+    };
+    if squeeze {
+        // Invite and Save share the bottom row; the line for Invite sits above it.
+        let half = (inner.width() - S2) / 2.0;
+        let row = Rect::from_min_size(pos2(inner.left(), inner.bottom() - 34.0), vec2(inner.width(), 34.0));
+        if widgets::button(ui, Rect::from_min_size(row.min, vec2(half, 34.0)), "lobby-keep-invite", &Btn::new(KEEP_INVITE).size(13.0)).clicked() { acts.push(Act::KeepInvite); }
+        if widgets::button(ui, Rect::from_min_size(pos2(row.right() - half, row.top()), vec2(half, 34.0)), "lobby-save-track", &Btn::new(save_label).enabled(!downloading && !saved).size(13.0)).clicked() { acts.push(Act::SaveTrack); }
+        // Just above the buttons, wherever the panel's spare height is (portrait has plenty).
+        note(p, Rect::from_min_max(pos2(inner.left(), (row.top() - 20.0).max(hint_y + 8.0)), pos2(inner.right(), row.top() - 2.0)));
+        return;
+    }
     if l.custom.is_some() {
         let save = Rect::from_min_size(pos2(inner.left(), inner.bottom() - 34.0), vec2(inner.width(), 34.0));
-        if widgets::button(ui, save, "lobby-save-track", &Btn::new(if saved { "Saved in My Tracks" } else { "Save to My Tracks" }).enabled(!downloading && !saved).size(14.0)).clicked() { acts.push(Act::SaveTrack); }
+        if widgets::button(ui, save, "lobby-save-track", &Btn::new(save_label).enabled(!downloading && !saved).size(14.0)).clicked() { acts.push(Act::SaveTrack); }
+    }
+    if keep {
+        // In a room on a Keep: one more action, with its line beside it.
+        let row = Rect::from_min_size(pos2(inner.left(), inner.bottom() - 34.0), vec2(inner.width(), 34.0));
+        let btn = Rect::from_min_size(row.min, vec2(132.0_f32.min(row.width()), row.height()));
+        if widgets::button(ui, btn, "lobby-keep-invite", &Btn::new(KEEP_INVITE).size(12.0)).clicked() { acts.push(Act::KeepInvite); }
+        note(p, Rect::from_min_max(pos2(btn.right() + S2, row.top()), row.max));
     }
 }
 

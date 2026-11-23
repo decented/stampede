@@ -32,6 +32,24 @@ pub const NOT_AN_INVITE: &str = "That isn't a Stampede invite link.";
 /// Paste invite, and the clipboard holds no invite link at all.
 pub const NO_INVITE_ON_CLIPBOARD: &str = "No invite link on the clipboard. Copy the link your friend sent, then tap Paste invite.";
 
+/// The My Signet page an owner invites someone to a Keep from, up to the Keep's key. Everything
+/// is in the fragment, so nothing reaches a server. The Keep's owner confirms there; the game
+/// holds no key and gains no authority.
+const MY_SIGNET_INVITE: &str = "https://mysignet.app/#keep-invite=1&k=";
+/// ...and what follows the key: which game is asking.
+const MY_SIGNET_INVITE_GAME: &str = "&g=stampede";
+
+/// A key as lowercase hex.
+pub fn hex(key: &[u8]) -> String {
+    fray_keep::hex_encode(key)
+}
+
+/// The link that opens My Signet's invite screen for the Keep `host_key`, or `None` when the key
+/// is not exactly 32 bytes. The caller passes only a key the join proved, never one a host sent.
+pub fn keep_invite_link(host_key: &[u8]) -> Option<String> {
+    (host_key.len() == 32).then(|| format!("{MY_SIGNET_INVITE}{}{MY_SIGNET_INVITE_GAME}", hex(host_key)))
+}
+
 /// Longest name kept, as Fray's crate cuts it: the tests check it.
 #[cfg(test)]
 const MAX_NAME: usize = 40;
@@ -189,6 +207,28 @@ mod tests {
 
     const HOST: [u8; 32] = [0xab; 32];
     const SECRET: [u8; 32] = [0x01; 32];
+
+    #[test]
+    fn the_my_signet_link_is_exact_lowercase_hex_in_the_fragment_only() {
+        let mut key = [0u8; 32];
+        for (i, b) in key.iter_mut().enumerate() {
+            *b = 0xa0 + i as u8;
+        }
+        let link = keep_invite_link(&key).unwrap();
+        assert_eq!(link, "https://mysignet.app/#keep-invite=1&k=a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf&g=stampede");
+        assert_eq!(link, link.to_lowercase(), "lowercase hex");
+        assert!(!link.contains('?'), "no query string");
+        assert_eq!(link.matches('#').count(), 1);
+        assert_eq!(link.matches('&').count(), 2, "only the three fragment parameters");
+        assert_eq!(keep_invite_link(&HOST).unwrap(), format!("https://mysignet.app/#keep-invite=1&k={}&g=stampede", "ab".repeat(32)));
+    }
+
+    #[test]
+    fn the_my_signet_link_refuses_a_key_that_is_not_32_bytes() {
+        for len in [0, 1, 31, 33, 64] {
+            assert_eq!(keep_invite_link(&vec![0xab; len]), None, "{len} bytes");
+        }
+    }
 
     fn dir(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("stampede-keeps-test-{tag}-{}", std::process::id()));

@@ -279,6 +279,8 @@ pub const SCREENS: &[(&str, fn() -> Box<dyn Screen>)] = &[
     ("lobby_sample", || Box::new(lobby::LobbyScreen::lobby_sample())),
     ("lobby_custom_sample", || Box::new(lobby::LobbyScreen::custom_host_sample())),
     ("lobby_custom_guest_sample", || Box::new(lobby::LobbyScreen::custom_guest_sample())),
+    ("lobby_keep_guest_sample", || Box::new(lobby::LobbyScreen::keep_guest_sample())),
+    ("lobby_keep_custom_guest_sample", || Box::new(lobby::LobbyScreen::keep_custom_guest_sample())),
     ("lobby_custom_downloading_sample", || Box::new(lobby::LobbyScreen::custom_downloading_sample())),
     ("join", || Box::new(join::JoinScreen::new())),
     ("join_sample", || Box::new(join::JoinScreen::sample())),

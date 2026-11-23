@@ -238,6 +238,9 @@ pub struct OnlineSession {
     ended: Option<String>,
     /// This session joined a Keep by invite (not a room by code).
     keep_join: bool,
+    /// The Keep key the invite or saved Keep named, for an invite join. Never read directly: see
+    /// [`OnlineSession::keep_key`], which hands it out only once the link has proven the host.
+    keep_key: Option<[u8; 32]>,
     /// Session time this device resumed after a takeover.
     resumed_at: Option<u64>,
 }
@@ -280,6 +283,7 @@ impl OnlineSession {
             mstate: MigrationState::Idle,
             ended: None,
             keep_join: false,
+            keep_key: None,
             resumed_at: None,
         }
     }
@@ -446,8 +450,23 @@ impl OnlineSession {
         let link = race_session::join_invite(&net, &id, &secret, host_key);
         let mut s = Self::network_client(net, id, link, "", None, name, character);
         s.keep_join = true;
+        s.keep_key = Some(host_key);
         s.autopilot = Self::dev_autopilot(data_dir);
         Ok(s)
+    }
+
+    /// The key of the Keep this session joined by invite (a link or My Keeps), once the link has
+    /// proven the host is that Keep: the host the signed welcome named has the key the invite
+    /// named. `None` for a room joined by code, Nearby or Bluetooth, a room this phone hosts, a
+    /// join that has not connected yet, and a link that proved no host (loopback). It is never
+    /// taken from anything the host sent.
+    pub fn keep_key(&self) -> Option<[u8; 32]> {
+        let key = self.keep_key?;
+        if self.host.is_some() {
+            return None;
+        }
+        let proven = self.me().host_identity()?;
+        proven.pubkey.eq_ignore_ascii_case(&crate::keeps::hex(&key)).then_some(key)
     }
 
     /// Join a room heard on the LAN.
