@@ -149,6 +149,16 @@ impl LobbyScreen {
         LobbyScreen { sample_keep: Some([0xab; 32]), ..Self::custom_guest_sample() }
     }
 
+    /// A Keep guest's Battle lobby (screenshots).
+    pub fn keep_battle_guest_sample() -> LobbyScreen {
+        LobbyScreen { sample_keep: Some([0xab; 32]), ..Self::battle_guest_sample() }
+    }
+
+    /// A Keep guest waiting for a custom track to download (screenshots).
+    pub fn keep_custom_downloading_sample() -> LobbyScreen {
+        LobbyScreen { sample_keep: Some([0xab; 32]), ..Self::custom_downloading_sample() }
+    }
+
     pub fn custom_downloading_sample() -> LobbyScreen {
         LobbyScreen { sample_downloading: true, ..Self::custom_guest_sample() }
     }
@@ -920,7 +930,10 @@ fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_
         let _ = connecting;
         return;
     };
-    let card = Rect::from_min_size(inner.min, vec2(inner.width(), 124.0));
+    // On a Keep, a custom track (Save button) or a Battle (an extra row) leaves no room for one more
+    // action on the shortest phone: the card and the rows close up a little.
+    let squeeze = keep && (l.custom.is_some() || l.battle.is_some());
+    let card = Rect::from_min_size(inner.min, vec2(inner.width(), if squeeze { 108.0 } else { 124.0 }));
     if downloading {
         widgets::well(p, card, 14.0);
         let text = track_error.map(|e| format!("Couldn't download the track: {e}")).unwrap_or_else(|| "Downloading track…".into());
@@ -931,10 +944,7 @@ fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_
         let info = tracks::info(l.battle.map_or(l.track, |b| b.arena));
         tracks::card(ui, card, "lobby-track", &info, false, None, None, false, 1.0);
     }
-    // On a Keep with a custom track there is one more action and the Save button too: the rows
-    // close up so both fit on the shortest phone.
-    let squeeze = keep && l.custom.is_some();
-    let (step, last) = if squeeze { (18.0, 22.0) } else { (22.0, 26.0) };
+    let (step, last) = if squeeze { (18.0, 20.0) } else { (22.0, 26.0) };
     let mut y = card.bottom() + 14.0;
     let line = |y: f32, a: &str, b: &str| {
         p.text(pos2(inner.left() + 2.0, y), Align2::LEFT_CENTER, a, theme::ui_bold(12.0), theme::SAND);
@@ -966,11 +976,13 @@ fn guest_panel(ui: &mut egui::Ui, p: &Painter, inner: Rect, lobby: Option<&race_
         p.galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, theme::TEXT_DIM);
     };
     if squeeze {
-        // Invite and Save share the bottom row; the line for Invite sits above it.
+        // Invite and Save (when there is a Save) share the bottom row; the line for Invite sits above it.
+        let has_save = l.custom.is_some();
         let half = (inner.width() - S2) / 2.0;
         let row = Rect::from_min_size(pos2(inner.left(), inner.bottom() - 34.0), vec2(inner.width(), 34.0));
-        if widgets::button(ui, Rect::from_min_size(row.min, vec2(half, 34.0)), "lobby-keep-invite", &Btn::new(KEEP_INVITE).size(13.0)).clicked() { acts.push(Act::KeepInvite); }
-        if widgets::button(ui, Rect::from_min_size(pos2(row.right() - half, row.top()), vec2(half, 34.0)), "lobby-save-track", &Btn::new(save_label).enabled(!downloading && !saved).size(13.0)).clicked() { acts.push(Act::SaveTrack); }
+        let invite = Rect::from_min_size(row.min, vec2(if has_save { half } else { row.width() }, 34.0));
+        if widgets::button(ui, invite, "lobby-keep-invite", &Btn::new(KEEP_INVITE).size(13.0)).clicked() { acts.push(Act::KeepInvite); }
+        if has_save && widgets::button(ui, Rect::from_min_size(pos2(row.right() - half, row.top()), vec2(half, 34.0)), "lobby-save-track", &Btn::new(save_label).enabled(!downloading && !saved).size(13.0)).clicked() { acts.push(Act::SaveTrack); }
         // Just above the buttons, wherever the panel's spare height is (portrait has plenty).
         note(p, Rect::from_min_max(pos2(inner.left(), (row.top() - 20.0).max(hint_y + 8.0)), pos2(inner.right(), row.top() - 2.0)));
         return;
