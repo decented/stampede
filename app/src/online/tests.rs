@@ -3038,3 +3038,133 @@ fn protect_on_an_online_code_room_reopens_it_nearby_only_and_arms_it() {
         assert!(!texts.iter().any(|t| t == gone), "{gone} is still shown: {texts:?}");
     }
 }
+
+// ─── Invite to this Keep ────────────────────────────────────────────────────
+
+/// A link that proves its host is `host` (as a QUIC link does), or proves none.
+struct Proves {
+    inner: Box<dyn race_session::ClientTransport>,
+    host: Option<[u8; 32]>,
+}
+
+impl race_session::ClientTransport for Proves {
+    fn poll(&mut self) -> Option<race_session::ClientNetEvent> {
+        use race_session::{ClientNetEvent, HostIdentity};
+        match self.inner.poll()? {
+            ClientNetEvent::Connected { .. } => Some(ClientNetEvent::Connected {
+                host: self.host.map(|k| HostIdentity { name: "Keep".into(), pubkey: crate::keeps::hex(&k), npub: String::new() }),
+            }),
+            ev => Some(ev),
+        }
+    }
+    fn send_reliable(&mut self, bytes: Vec<u8>) {
+        self.inner.send_reliable(bytes)
+    }
+    fn send_lossy(&mut self, bytes: Vec<u8>) {
+        self.inner.send_lossy(bytes)
+    }
+    fn rtt_ms(&self) -> Option<u32> {
+        self.inner.rtt_ms()
+    }
+    fn close(&mut self) {
+        self.inner.close()
+    }
+}
+
+const KEEP_KEY: [u8; 32] = [0x5c; 32];
+
+/// The link for [`KEEP_KEY`], written out in full.
+fn keep_link() -> String {
+    format!("https://mysignet.app/#keep-invite=1&k={}&g=stampede", "5c".repeat(32))
+}
+
+/// Where `label` is drawn by a frame of `p` (the centre of its text).
+fn text_centre(p: &mut Phone, label: &str) -> Option<egui::Pos2> {
+    fn walk(shape: &egui::epaint::Shape, label: &str, out: &mut Option<egui::Pos2>) {
+        match shape {
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| walk(s, label, out)),
+            egui::epaint::Shape::Text(t) if t.galley.text() == label => {
+                let r = t.galley.rect;
+                *out = Some(t.pos + r.center().to_vec2());
+            }
+            _ => {}
+        }
+    }
+    let out = p.engine.frame(1.0 / 60.0, SIZE, PPP, egui::RawInput::default());
+    let mut found = None;
+    for cs in &out.egui.shapes {
+        walk(&cs.shape, label, &mut found);
+    }
+    found
+}
+
+/// A guest that joins the rig's room through the Keep path (an invite join for `named`, the link
+/// proving `proves`), seated on the lobby screen.
+fn join_keep(r: &mut Rig, named: [u8; 32], proves: Option<[u8; 32]>) -> usize {
+    let mut g = Phone::new("keep-guest");
+    let link = Proves { inner: Box::new(r.hub.connect(LoopbackConfig::PERFECT)), host: proves };
+    let mut s = OnlineSession::from_parts(ClientSession::new(Box::new(link), "Guest", 3), None, r.clock.clone());
+    s.keep_join = true;
+    s.keep_key = Some(named);
+    g.open_lobby(s);
+    r.guests.push(g);
+    r.guests.len() - 1
+}
+
+fn opened(p: &Phone) -> Vec<String> {
+    p.engine.svc.platform.recorded().unwrap().opened.clone()
+}
+
+#[test]
+fn a_guest_on_a_keep_can_open_my_signet_from_the_lobby_and_only_that_happens() {
+    let mut r = Rig::new(1, 2);
+    let g = join_keep(&mut r, KEEP_KEY, Some(KEEP_KEY));
+    r.seat_everyone();
+    r.steps(60);
+    assert_eq!(r.guests[g].slot().with(|s| s.keep_key()).flatten(), Some(KEEP_KEY), "the link proved this Keep");
+    let texts = frame_texts(&mut r.guests[g]);
+    assert!(texts.iter().any(|t| t == crate::ui::screens::lobby::KEEP_INVITE), "{texts:?}");
+    assert!(texts.iter().any(|t| t == crate::ui::screens::lobby::KEEP_INVITE_NOTE), "{texts:?}");
+    // The host's room, and the host's own phone, offer nothing of the kind.
+    assert!(!frame_texts(&mut r.host).iter().any(|t| t == crate::ui::screens::lobby::KEEP_INVITE));
+    let at = text_centre(&mut r.guests[g], crate::ui::screens::lobby::KEEP_INVITE).expect("the action is drawn");
+    let before = r.guests[g].slot().with(|s| s.me().my_lobby_seat().map(|m| m.ready));
+    assert!(opened(&r.guests[g]).is_empty());
+    r.guests[g].tap(at.x, at.y);
+    assert_eq!(opened(&r.guests[g]), vec![keep_link()], "exactly that link, once");
+    assert!(r.guests[g].engine.svc.platform.recorded().unwrap().copied.is_empty(), "nothing copied");
+    assert_eq!(r.guests[g].top(), "lobby");
+    assert_eq!(r.guests[g].slot().with(|s| s.me().my_lobby_seat().map(|m| m.ready)), before, "no room state changed");
+}
+
+#[test]
+fn off_a_keep_the_lobby_offers_no_keep_invite() {
+    let mut r = Rig::new(1, 2);
+    // Joined by code, Nearby or Bluetooth: no Keep key, even though the host proves a key.
+    let mut by_code = Phone::new("by-code");
+    let link = Proves { inner: Box::new(r.hub.connect(LoopbackConfig::PERFECT)), host: Some(KEEP_KEY) };
+    by_code.open_lobby(OnlineSession::from_parts(ClientSession::new(Box::new(link), "A", 1), None, r.clock.clone()));
+    r.guests.push(by_code);
+    // An invite for one Keep, answered by a different host.
+    let other = join_keep(&mut r, KEEP_KEY, Some([0x11; 32]));
+    // An invite whose link proved no host at all.
+    let unproven = join_keep(&mut r, KEEP_KEY, None);
+    r.seat_everyone();
+    r.steps(60);
+    assert_eq!(r.guests[0].slot().with(|s| s.keep_key()).flatten(), None);
+    assert_eq!(r.guests[other].slot().with(|s| s.keep_key()).flatten(), None, "another host than the invite's");
+    assert_eq!(r.guests[unproven].slot().with(|s| s.keep_key()).flatten(), None, "nothing proved");
+    // A room this phone hosts, even carrying a key, is not on a Keep.
+    r.host.slot().with(|s| s.keep_key = Some(KEEP_KEY));
+    assert_eq!(r.host.slot().with(|s| s.keep_key()).flatten(), None);
+    for i in 0..r.guests.len() {
+        let texts = frame_texts(&mut r.guests[i]);
+        assert!(!texts.iter().any(|t| t == crate::ui::screens::lobby::KEEP_INVITE || t == crate::ui::screens::lobby::KEEP_INVITE_NOTE), "guest {i}: {texts:?}");
+    }
+    let texts = frame_texts(&mut r.host);
+    assert!(texts.iter().any(|t| t == "Share link"), "the host's own invite control is as before");
+    assert!(!texts.iter().any(|t| t == crate::ui::screens::lobby::KEEP_INVITE));
+    for p in r.phones() {
+        assert!(opened(p).is_empty());
+    }
+}
